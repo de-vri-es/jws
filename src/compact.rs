@@ -29,11 +29,11 @@ impl Message {
 	/// Create a new Message by decoding the individual parts of a JWS Compact Serialization message.
 	pub fn decode_parts(header: &[u8], payload: &[u8]) -> Result<Self> {
 		// Undo base64 encoding of parts.
-		let header  = base64::decode_config(header,  base64::URL_SAFE_NO_PAD)?;
-		let payload = base64::decode_config(payload, base64::URL_SAFE_NO_PAD)?;
+		let header  = base64::decode_config(header,  base64::URL_SAFE_NO_PAD).map_err(|_| Error::invalid_message("invalid base64 in header"))?;
+		let payload = base64::decode_config(payload, base64::URL_SAFE_NO_PAD).map_err(|_| Error::invalid_message("invalid base64 in payload"))?;
 
 		// Decode the header as JSON dictionary.
-		let header: BTreeMap<String, JsonValue> = serde_json::from_slice(&header)?;
+		let header: BTreeMap<String, JsonValue> = serde_json::from_slice(&header).map_err(|_| Error::invalid_message("invalid JSON in header"))?;
 
 		// Put the parts back together.
 		Ok(Self{header, payload})
@@ -52,13 +52,13 @@ pub fn split_encoded_parts(data: &[u8]) -> Result<CompactSerializedParts> {
 	// Split data into parts.
 	let mut parts = data.splitn(4, |&c| c == b'.');
 
-	let header    = parts.next().ok_or_else(|| error::InvalidMessage("encoded message does not contain a header".to_string()))?;
-	let payload   = parts.next().ok_or_else(|| error::InvalidMessage("encoded message does not contain a payload".to_string()))?;
-	let signature = parts.next().ok_or_else(|| error::InvalidMessage("encoded message does not contain a signature".to_string()))?;
+	let header    = parts.next().ok_or_else(|| Error::invalid_message("encoded message does not contain a header"))?;
+	let payload   = parts.next().ok_or_else(|| Error::invalid_message("encoded message does not contain a payload"))?;
+	let signature = parts.next().ok_or_else(|| Error::invalid_message("encoded message does not contain a signature"))?;
 
 	// Make sure there are no additional message parts in the input.
 	if parts.next().is_some() {
-		return Err(Error::from(error::InvalidMessage("encoded message contains an additional field after the signature".to_string())));
+		return Err(Error::invalid_message("encoded message contains an additional field after the signature"));
 	}
 
 	Ok(CompactSerializedParts{header, payload, signature})
@@ -86,7 +86,7 @@ impl<'a> CompactSerializedParts<'a> {
 	/// separated by period '.' characters.
 	pub fn decode(&self) -> Result<(Message, Vec<u8>)> {
 		let message   = Message::decode_parts(self.header, self.payload)?;
-		let signature = base64::decode_config(self.signature, base64::URL_SAFE_NO_PAD)?;
+		let signature = base64::decode_config(self.signature, base64::URL_SAFE_NO_PAD).map_err(|_| Error::invalid_message("invalid base64 in signature"))?;
 		Ok((message, signature))
 	}
 }

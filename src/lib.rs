@@ -1,4 +1,10 @@
 //! This library provides JSON Web Signature encoding, decoding, signing and verification.
+//!
+//! Currently, encoding and decoding is available only for the JWS Compact Serialization scheme in the
+//! [`compact`] module.
+//!
+//! Signing and verifying is done through the [`Signer`] and [`Verifier`] traits,
+//! for which some implementations based on `rust-crypto` are available in the `[crypto]` module.
 
 pub mod compact;
 pub mod crypto;

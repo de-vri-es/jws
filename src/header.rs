@@ -1,7 +1,7 @@
 //! Types for working with message headers.
 
 use crate::{JsonValue, Result};
-use crate::error;
+use crate::error::Error;
 
 /// A JWS message header.
 pub type HeaderMap = std::collections::BTreeMap<String, JsonValue>;
@@ -63,17 +63,17 @@ impl<'a> Headers<'a> {
 	///
 	/// This is almost identical to [`get`](#method.get), except that this function returns a properly formatter error instead of an empty optional.
 	pub fn get_required(&self, key: &str) -> Result<&'a JsonValue> {
-		let value = self.get(key).ok_or_else(|| error::MissingHeaderParam(key.to_string()))?;
+		let value = self.get(key).ok_or_else(|| Error::missing_header_param(key))?;
 		Ok(value)
 	}
 
 	/// Get and deserialize a required parameter from either header.
 	///
 	/// This function delegates to [`get_required`](#method.get_required) and deserializes the result into the desired type.
-	/// Deserialization errors are reported as [`error::InvalidHeaderParam`] errors.
+	/// Deserialization errors are reported as [`Error::InvalidHeaderParam`].
 	pub fn deserialize_required<T: serde::Deserialize<'a> + 'a>(&self, key: &str) -> Result<T> {
 		let value = self.get_required(key)?;
-		let value = T::deserialize(value).map_err(|_| error::InvalidHeaderParam(key.to_string()))?;
+		let value = T::deserialize(value).map_err(|_| Error::invalid_header_param(key))?;
 		Ok(value)
 	}
 }

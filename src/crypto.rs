@@ -30,7 +30,7 @@ impl Verifier for HmacVerifier {
 			"HS256" => verify_mac(encoded_header, encoded_payload, signature, &mut Hmac::new(sha2::Sha256::new(), &self.key)),
 			"HS384" => verify_mac(encoded_header, encoded_payload, signature, &mut Hmac::new(sha2::Sha384::new(), &self.key)),
 			"HS512" => verify_mac(encoded_header, encoded_payload, signature, &mut Hmac::new(sha2::Sha512::new(), &self.key)),
-			_       => Err(Error::from(error::UnsupportedMacAlgorithm(algorithm.to_string()))),
+			_       => Err(Error::unsupported_mac_algorithm(algorithm.to_string())),
 		}
 	}
 }
@@ -83,6 +83,6 @@ fn verify_mac(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], m
 	if digest == MacResult::new(signature) {
 		Ok(())
 	} else {
-		Err(Error::InvalidSignature)
+		Err(Error::invalid_signature(""))
 	}
 }
