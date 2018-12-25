@@ -90,3 +90,34 @@ impl<'a> CompactSerializedParts<'a> {
 		Ok((message, signature))
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	fn test_split_valid(source: &[u8], header: &[u8], payload: &[u8], signature: &[u8]) {
+		let parts = split_encoded_parts(source).unwrap();
+		assert_eq!(parts.header,    header);
+		assert_eq!(parts.payload,   payload);
+		assert_eq!(parts.signature, signature);
+
+	}
+
+	#[test]
+	fn test_split_encoded_parts() {
+		// Test splitting some valid sequences.
+		test_split_valid(b"..",            b"",    b"",     b"");
+		test_split_valid(b"..mies",        b"",    b"",     b"mies");
+		test_split_valid(b".noot.",        b"",    b"noot", b"");
+		test_split_valid(b".noot.mies",    b"",    b"noot", b"mies");
+		test_split_valid(b"aap..",         b"aap", b"",     b"");
+		test_split_valid(b"aap..mies",     b"aap", b"",     b"mies");
+		test_split_valid(b"aap.noot.",     b"aap", b"noot", b"");
+		test_split_valid(b"aap.noot.mies", b"aap", b"noot", b"mies");
+
+		// Test splitting some invalid sequences.
+		assert_eq!(split_encoded_parts(b"aapnootmies").err().unwrap().kind(), Error::InvalidMessage);
+		assert_eq!(split_encoded_parts(b"aap.nootmies").err().unwrap().kind(), Error::InvalidMessage);
+		assert_eq!(split_encoded_parts(b"aap.noot.mies.").err().unwrap().kind(), Error::InvalidMessage);
+	}
+}
