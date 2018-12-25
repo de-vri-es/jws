@@ -6,7 +6,7 @@ description   = "JSON Web Signature for Rust!"
 documentation = "http://docs/rs/jws/"
 repository    = "http://github.com/de-vri-es/jws"
 readme        = "README.md"
-keywords      = ["JWS", "JWT", "JSON", "web", "signature", "token"]
+keywords      = ["JWS", "JWT", "JSON", "web", "token"]
 license       = "BSD-2-Clause"
 edition       = "2018"
 
