@@ -4,7 +4,7 @@ use crypto::mac::{Mac, MacResult};
 use crypto::hmac::{Hmac};
 use crypto::sha2;
 
-use crate::{error, Error, Headers, HeadersMut, Result, Signer, Verifier};
+use crate::{Error, Headers, HeadersMut, Result, Signer, Verifier};
 
 pub struct HmacVerifier{
 	key: Vec<u8>,

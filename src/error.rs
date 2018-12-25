@@ -46,6 +46,8 @@ impl ErrorKind {
 }
 
 impl Error {
+	#![allow(non_upper_case_globals)]
+
 	pub const Other                   : ErrorKind = ErrorKind::Other;
 	pub const MissingHeaderParam      : ErrorKind = ErrorKind::MissingHeaderParam;
 	pub const InvalidHeaderParam      : ErrorKind = ErrorKind::InvalidHeaderParam;
@@ -98,12 +100,12 @@ impl Error {
 impl fmt::Display for ErrorKind {
 	fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			Other                   => write!(formatter, "unspecified error"),
-			MissingHeaderParam      => write!(formatter, "missing header parameter"),
-			InvalidHeaderParam      => write!(formatter, "invalid header parameter"),
-			UnsupportedMacAlgorithm => write!(formatter, "unsupported MAC algorithm"),
-			InvalidMessage          => write!(formatter, "invalid message"),
-			InvalidSignature        => write!(formatter, "invalid signature"),
+			ErrorKind::Other                   => write!(formatter, "unspecified error"),
+			ErrorKind::MissingHeaderParam      => write!(formatter, "missing header parameter"),
+			ErrorKind::InvalidHeaderParam      => write!(formatter, "invalid header parameter"),
+			ErrorKind::UnsupportedMacAlgorithm => write!(formatter, "unsupported MAC algorithm"),
+			ErrorKind::InvalidMessage          => write!(formatter, "invalid message"),
+			ErrorKind::InvalidSignature        => write!(formatter, "invalid signature"),
 		}
 	}
 }

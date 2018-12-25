@@ -3,7 +3,6 @@
 use std::collections::BTreeMap;
 
 use crate::{
-	error,
 	AvailableHeaders,
 	Error,
 	HeaderMap,
