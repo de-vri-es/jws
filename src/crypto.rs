@@ -13,8 +13,10 @@ pub struct HmacVerifier{
 pub struct MacSigner<M>(pub Hmac<M>);
 
 impl HmacVerifier {
-	pub fn new(key: Vec<u8>) -> Self {
-		Self{key}
+	pub fn new<K>(key: K) -> Self where
+		Vec<u8>: From<K>,
+	{
+		Self{key: key.into()}
 	}
 }
 
@@ -84,5 +86,48 @@ fn verify_mac(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], m
 		Ok(())
 	} else {
 		Err(Error::invalid_signature(""))
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::compact;
+
+	// Example taken from RFC 7515 appendix A.1
+	// https://tools.ietf.org/html/rfc7515#appendix-A.1
+	//
+	// Header:
+	//   {"typ":"JWT",
+	//    "alg":"HS256"}
+	//
+	// Payload:
+	//  {"iss":"joe",
+	//   "exp":1300819380,
+	//   "http://example.com/is_root":true}
+	//
+	//  Key: AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow
+	//
+	//  Signature: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+
+	const RFC7515_A1_ENCODED         : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+	const RFC7515_A1_ENCODED_MANGLED : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTlzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+	const RFC7515_A1_PAYLOAD         : &[u8] = b"{\"iss\":\"joe\",\r\n \"exp\":1300819380,\r\n \"http://example.com/is_root\":true}";
+	const RFC7515_A1_KEY             : &[u8] = &[3, 35, 53, 75, 43, 15, 165, 188, 131, 126, 6, 101, 119, 123, 166, 143, 90, 179, 40, 230, 240, 84, 201, 40, 169, 15, 132, 178, 210, 80, 46, 191, 211, 251, 90, 146, 210, 6, 71, 239, 150, 138, 180, 195, 119, 98, 61, 34, 61, 46, 33, 114, 5, 46, 79, 8, 192, 205, 154, 245, 103, 208, 128, 163];
+
+	#[test]
+	fn test_decode_verify() {
+		let message = compact::decode_verify(RFC7515_A1_ENCODED, HmacVerifier::new(RFC7515_A1_KEY)).unwrap();
+		assert_eq!(message.header.get("alg").unwrap(), "HS256");
+		assert_eq!(message.header.get("typ").unwrap(), "JWT");
+		assert_eq!(message.header.len(), 2);
+
+		assert_eq!(&message.payload[..], RFC7515_A1_PAYLOAD);
+	}
+
+	#[test]
+	fn test_decode_verify_invalid() {
+		let result = compact::decode_verify(RFC7515_A1_ENCODED_MANGLED, HmacVerifier::new(RFC7515_A1_KEY));
+		assert_eq!(result.err().unwrap().kind(), Error::InvalidSignature);
 	}
 }
