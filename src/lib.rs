@@ -50,12 +50,4 @@ pub trait Signer {
 	///
 	/// The returned MAC must be plain bytes, not hex or base64 encoded.
 	fn compute_mac(&mut self, encoded_protected_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>>;
-
-	/// Sign a message.
-	///
-	/// This is a shorthand for calling [`set_header_params`](#method.set_header_params) followed by [`compute_mac`](#compute_mac).
-	fn sign(&mut self, headers: HeadersMut, encoded_protected_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		self.set_header_params(headers)?;
-		self.compute_mac(encoded_protected_header, encoded_payload)
-	}
 }

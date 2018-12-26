@@ -8,6 +8,7 @@ use crate::{
 	HeaderMap,
 	JsonValue,
 	Result,
+	Signer,
 	Verifier,
 };
 
@@ -19,15 +20,24 @@ use crate::{
 /// You can call [`decode_verify`] to decode and verify a message.
 /// Alternatively, you can call [`split_encoded_parts`], decode the parts and then use a [`Verifier`] manually.
 /// The latter allows you to access the decoded message, even if it's signature is invalid.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Message {
 	pub header  : HeaderMap,
 	pub payload : Vec<u8>,
 }
 
-/// An encoded JWS Compact Serialization message without the signature.
+/// An encoded JWS Compact Serialization message without signature.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EncodedMessage {
 	data          : Vec<u8>,
 	header_length : usize,
+}
+/// An encoded JWS Compact Serialization message with signature.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EncodedSignedMessage {
+	data           : Vec<u8>,
+	header_length  : usize,
+	payload_length : usize,
 }
 
 impl Message {
@@ -60,6 +70,26 @@ impl Message {
 
 		EncodedMessage{data: buffer.into_bytes(), header_length}
 	}
+
+	/// Encode and sign the message.
+	pub fn encode_sign(&mut self, signer: &mut impl Signer) -> Result<EncodedSignedMessage> {
+		// Let the signer set the headers and encode the message.
+		signer.set_header_params(AvailableHeaders::ProtectedOnly(&mut self.header))?;
+		let encoded = self.encode();
+
+		// Sign the encoded message.
+		let mut signature = signer.compute_mac(encoded.header(), encoded.payload())?;
+
+		// Concat the signature to the encoded message.
+		let header_length  = encoded.header().len();
+		let payload_length = encoded.payload().len();
+		let mut data       = encoded.into_data();
+		data.reserve(signature.len() + 1);
+		data.push(b'.');
+		data.append(&mut signature);
+
+		Ok(EncodedSignedMessage{data, header_length, payload_length})
+	}
 }
 
 impl EncodedMessage {
@@ -81,6 +111,54 @@ impl EncodedMessage {
 	/// Get the payload part of the encoded message.
 	pub fn payload(&self) -> &[u8] {
 		&self.data[self.header_length + 1..]
+	}
+}
+
+impl EncodedSignedMessage {
+	/// Get a reference to the raw data.
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
+
+	/// Get the raw data, consuming the encoded message.
+	pub fn into_data(self) -> Vec<u8> {
+		self.data
+	}
+
+	/// Get the header part of the encoded message.
+	pub fn header(&self) -> &[u8] {
+		&self.data[..self.header_length]
+	}
+
+	/// Get the payload part of the encoded message.
+	pub fn payload(&self) -> &[u8] {
+		&self.data[self.payload_start()..self.payload_end()]
+	}
+
+	/// Get the signature part of the encoded message.
+	pub fn signature(&self) -> &[u8] {
+		&self.data[self.signature_start()..]
+	}
+
+	/// Get the parts of the message as a [`CompactSerializedParts`] struct.
+	pub fn parts(&self) -> CompactSerializedParts {
+		CompactSerializedParts {
+			header:    self.header(),
+			payload:   self.payload(),
+			signature: self.signature(),
+		}
+	}
+
+	fn payload_start(&self) -> usize {
+		self.header_length + 1
+	}
+
+	fn payload_end(&self) -> usize {
+		self.payload_start() + self.payload_length
+	}
+
+	fn signature_start(&self) -> usize {
+		self.payload_end() + 1
 	}
 }
 
