@@ -24,6 +24,12 @@ pub struct Message {
 	pub payload : Vec<u8>,
 }
 
+/// An encoded JWS Compact Serialization message without the signature.
+pub struct EncodedMessage {
+	data          : Vec<u8>,
+	header_length : usize,
+}
+
 impl Message {
 	/// Create a new Message by decoding the individual parts of a JWS Compact Serialization message.
 	pub fn decode_parts(header: &[u8], payload: &[u8]) -> Result<Self> {
@@ -36,6 +42,45 @@ impl Message {
 
 		// Put the parts back together.
 		Ok(Self{header, payload})
+	}
+
+	/// Encode the message using the JWS Compact Serialization scheme.
+	pub fn encode(&self) -> EncodedMessage {
+		// Serializing header can't fail since it's already a JSON object.
+		let header_json = serde_json::ser::to_vec(&self.header).unwrap();
+
+		let output_len = base64_len(header_json.len()) + base64_len(self.payload.len()) + 1;
+		let mut buffer = String::with_capacity(output_len);
+
+		base64::encode_config_buf(&header_json, base64::URL_SAFE_NO_PAD, &mut buffer);
+		let header_length = buffer.len();
+
+		buffer.push('.');
+		base64::encode_config_buf(&self.payload, base64::URL_SAFE_NO_PAD, &mut buffer);
+
+		EncodedMessage{data: buffer.into_bytes(), header_length}
+	}
+}
+
+impl EncodedMessage {
+	/// Get a reference to the raw data.
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
+
+	/// Get the raw data, consuming the encoded message.
+	pub fn into_data(self) -> Vec<u8> {
+		self.data
+	}
+
+	/// Get the header part of the encoded message.
+	pub fn header(&self) -> &[u8] {
+		&self.data[..self.header_length]
+	}
+
+	/// Get the payload part of the encoded message.
+	pub fn payload(&self) -> &[u8] {
+		&self.data[self.header_length + 1..]
 	}
 }
 
@@ -90,9 +135,15 @@ impl<'a> CompactSerializedParts<'a> {
 	}
 }
 
+/// Compute the length of a base64 encoded string without padding, given the input length.
+fn base64_len(input_len: usize) -> usize {
+	// Multiply by 4, divide by 3 rounding up.
+	(input_len * 4 + 2) / 3
+}
+
 /// Decode a base64-url encoded string.
 fn decode_base64_url(value: &[u8], field_name: &str) -> Result<Vec<u8>> {
-	match base64::decode_config(value,  base64::URL_SAFE_NO_PAD) {
+	match base64::decode_config(value, base64::URL_SAFE_NO_PAD) {
 		Ok(x)  => Ok(x),
 		Err(_) => Err(Error::invalid_message(format!("invalid base64 in {}", field_name)))
 	}
