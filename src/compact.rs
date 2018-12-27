@@ -66,6 +66,13 @@ impl Message {
 		Self{header: header.into(), payload: payload.into()}
 	}
 
+	/// Parse the payload further, using serde.
+	///
+	/// The type must implement the [`serde::Deserialize`] trait
+	pub fn parse_payload<'de, T: serde::de::Deserialize<'de> + 'de>(&'de self) -> std::result::Result<T, serde_json::Error> {
+		T::deserialize(&self.payload)
+	}
+
 	/// Create a new Message by decoding the header and payload of a JWS Compact Serialization message.
 	pub fn decode_header_payload(header: &[u8], payload: &[u8]) -> Result<Self> {
 		// Undo base64 encoding of parts.
