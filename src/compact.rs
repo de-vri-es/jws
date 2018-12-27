@@ -12,6 +12,22 @@ use crate::{
 	Verifier,
 };
 
+/// Decode a JWS Compact Serialization message with signature from a byte slice.
+///
+/// A JWS Compact message consists of a base64-url encoded header and payload and signature,
+/// separated by period '.' characters.
+pub fn decode(data: &[u8]) -> Result<(Message, Vec<u8>)> {
+	split_encoded_parts(data)?.decode()
+}
+
+/// Decode and verify a JWS Compact Serialization message.
+pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<Message> {
+	let parts = split_encoded_parts(data)?;
+	let (message, signature) = parts.decode()?;
+	verifier.verify(AvailableHeaders::ProtectedOnly(&message.header), parts.header, parts.payload, &signature)?;
+	Ok(message)
+}
+
 /// A compact JWS message with header and payload, but without signature.
 ///
 /// The signature is left off because the signature can only be computed from (and verified for) a serialized message,
@@ -23,7 +39,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 pub struct Message {
 	pub header  : HeaderMap,
-	pub payload : Vec<u8>,
+	pub payload : JsonValue,
 }
 
 /// An encoded JWS Compact Serialization message without signature.
@@ -41,32 +57,34 @@ pub struct EncodedSignedMessage {
 }
 
 impl Message {
-	/// Create a new Message by decoding the individual parts of a JWS Compact Serialization message.
-	pub fn decode_parts(header: &[u8], payload: &[u8]) -> Result<Self> {
+	/// Create a new Message by decoding the header and payload of a JWS Compact Serialization message.
+	pub fn decode_header_payload(header: &[u8], payload: &[u8]) -> Result<Self> {
 		// Undo base64 encoding of parts.
 		let header  = decode_base64_url(header,  "header")?;
 		let payload = decode_base64_url(payload, "payload")?;
 
-		// Decode the header as JSON dictionary.
-		let header: BTreeMap<String, JsonValue> = decode_json(&header, "header")?;
+		// Decode the header and payload JSON.
+		let header:  BTreeMap<String, JsonValue> = decode_json(&header,  "header")?;
+		let payload: JsonValue                   = decode_json(&payload, "payload")?;
 
-		// Put the parts back together.
+		// Put the decoded parts back together.
 		Ok(Self{header, payload})
 	}
 
 	/// Encode the message using the JWS Compact Serialization scheme.
 	pub fn encode(&self) -> EncodedMessage {
 		// Serializing header can't fail since it's already a JSON object.
-		let header_json = serde_json::ser::to_vec(&self.header).unwrap();
+		let header_json  = serde_json::to_vec(&self.header).unwrap();
+		let payload_json = serde_json::to_vec(&self.payload).unwrap();
 
-		let output_len = base64_len(header_json.len()) + base64_len(self.payload.len()) + 1;
+		let output_len = base64_len(header_json.len()) + base64_len(payload_json.len()) + 1;
 		let mut buffer = String::with_capacity(output_len);
 
 		base64::encode_config_buf(&header_json, base64::URL_SAFE_NO_PAD, &mut buffer);
 		let header_length = buffer.len();
 
 		buffer.push('.');
-		base64::encode_config_buf(&self.payload, base64::URL_SAFE_NO_PAD, &mut buffer);
+		base64::encode_config_buf(&payload_json, base64::URL_SAFE_NO_PAD, &mut buffer);
 
 		EncodedMessage{data: buffer.into_bytes(), header_length}
 	}
@@ -162,6 +180,23 @@ impl EncodedSignedMessage {
 	}
 }
 
+/// The individual (still encoded) parts of a JWS Compact Serialized message.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct CompactSerializedParts<'a> {
+	pub header:    &'a [u8],
+	pub payload:   &'a [u8],
+	pub signature: &'a [u8],
+}
+
+impl<'a> CompactSerializedParts<'a> {
+	/// Decode the already-split parts of a JWS Compact Serialization message.
+	pub fn decode(&self) -> Result<(Message, Vec<u8>)> {
+		let message   = Message::decode_header_payload(self.header, self.payload)?;
+		let signature = decode_base64_url(self.signature, "signature")?;
+		Ok((message, signature))
+	}
+}
+
 /// Split the parts of a JWS Compact Serialization message.
 ///
 /// A JWS Compact Serialization message contains three base64-url encoded parts separated by period '.' characters:
@@ -184,33 +219,6 @@ pub fn split_encoded_parts(data: &[u8]) -> Result<CompactSerializedParts> {
 	}
 
 	Ok(CompactSerializedParts{header, payload, signature})
-}
-
-/// Decode and verify a JWS Compact Serialization message.
-pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<Message> {
-	let parts = split_encoded_parts(data)?;
-	let (message, signature) = parts.decode()?;
-	verifier.verify(AvailableHeaders::ProtectedOnly(&message.header), parts.header, parts.payload, &signature)?;
-	Ok(message)
-}
-
-/// The individual (still encoded) parts of a JWS Compact Serialized message.
-pub struct CompactSerializedParts<'a> {
-	pub header:    &'a [u8],
-	pub payload:   &'a [u8],
-	pub signature: &'a [u8],
-}
-
-impl<'a> CompactSerializedParts<'a> {
-	/// Decode a JWS Compact Serialization message with signature from a byte slice.
-	///
-	/// A JWS Compact message consists of a base64-url encoded header and payload and signature,
-	/// separated by period '.' characters.
-	pub fn decode(&self) -> Result<(Message, Vec<u8>)> {
-		let message   = Message::decode_parts(self.header, self.payload)?;
-		let signature = decode_base64_url(self.signature, "signature")?;
-		Ok((message, signature))
-	}
 }
 
 /// Compute the length of a base64 encoded string without padding, given the input length.
@@ -238,6 +246,7 @@ fn decode_json<'a, T: serde::Deserialize<'a>>(value: &'a [u8], field_name: &str)
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::JsonObject;
 
 	fn test_split_valid(source: &[u8], header: &[u8], payload: &[u8], signature: &[u8]) {
 		let parts = split_encoded_parts(source).unwrap();
@@ -282,9 +291,7 @@ mod test {
 	//  Signature: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
 
 	const RFC7515_A1_ENCODED         : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-	const RFC7515_A1_ENCODED_MANGLED : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTlzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-	const RFC7515_A1_PAYLOAD         : &[u8] = b"{\"iss\":\"joe\",\r\n \"exp\":1300819380,\r\n \"http://example.com/is_root\":true}";
-	const RFC7515_A1_PAYLOAD_MANGLED : &[u8] = b"{\"iss\":\"joe\",\r\n \"exp\":1300819s80,\r\n \"http://example.com/is_root\":true}";
+	const RFC7515_A1_ENCODED_MANGLED : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqc2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 	const RFC7515_A1_SIGNATURE       : &[u8] = &[116, 24, 223, 180, 151, 153, 224, 37, 79, 250, 96, 125, 216, 173, 187, 186, 22, 212, 37, 77, 105, 214, 191, 240, 91, 88, 5, 88, 83, 132, 141, 121];
 
 	#[test]
@@ -296,7 +303,11 @@ mod test {
 		assert_eq!(message.header.get("typ").unwrap(), "JWT");
 		assert_eq!(message.header.len(), 2);
 
-		assert_eq!(&message.payload[..], RFC7515_A1_PAYLOAD);
+		let payload : JsonObject = serde_json::from_value(message.payload).unwrap();
+		assert_eq!(payload.get("iss").unwrap(), "joe");
+		assert_eq!(payload.get("exp").unwrap(), 1300819380);
+		assert_eq!(payload.get("http://example.com/is_root").unwrap(), true);
+
 		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
 	}
 
@@ -309,7 +320,11 @@ mod test {
 		assert_eq!(message.header.get("typ").unwrap(), "JWT");
 		assert_eq!(message.header.len(), 2);
 
-		assert_eq!(&message.payload[..], RFC7515_A1_PAYLOAD_MANGLED);
+		let payload : JsonObject = serde_json::from_value(message.payload).unwrap();
+		assert_eq!(payload.get("iss").unwrap(), "jse");
+		assert_eq!(payload.get("exp").unwrap(), 1300819380);
+		assert_eq!(payload.get("http://example.com/is_root").unwrap(), true);
+
 		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
 	}
 }

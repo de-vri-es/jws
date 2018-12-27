@@ -92,7 +92,7 @@ fn verify_mac(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], m
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::compact;
+	use crate::{compact, JsonObject};
 
 	// Example taken from RFC 7515 appendix A.1
 	// https://tools.ietf.org/html/rfc7515#appendix-A.1
@@ -111,8 +111,7 @@ mod test {
 	//  Signature: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
 
 	const RFC7515_A1_ENCODED         : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-	const RFC7515_A1_ENCODED_MANGLED : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTlzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-	const RFC7515_A1_PAYLOAD         : &[u8] = b"{\"iss\":\"joe\",\r\n \"exp\":1300819380,\r\n \"http://example.com/is_root\":true}";
+	const RFC7515_A1_ENCODED_MANGLED : &[u8] = b"eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqc2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 	const RFC7515_A1_KEY             : &[u8] = &[3, 35, 53, 75, 43, 15, 165, 188, 131, 126, 6, 101, 119, 123, 166, 143, 90, 179, 40, 230, 240, 84, 201, 40, 169, 15, 132, 178, 210, 80, 46, 191, 211, 251, 90, 146, 210, 6, 71, 239, 150, 138, 180, 195, 119, 98, 61, 34, 61, 46, 33, 114, 5, 46, 79, 8, 192, 205, 154, 245, 103, 208, 128, 163];
 
 	#[test]
@@ -122,7 +121,10 @@ mod test {
 		assert_eq!(message.header.get("typ").unwrap(), "JWT");
 		assert_eq!(message.header.len(), 2);
 
-		assert_eq!(&message.payload[..], RFC7515_A1_PAYLOAD);
+		let payload : JsonObject = serde_json::from_value(message.payload).unwrap();
+		assert_eq!(payload.get("iss").unwrap(), "joe");
+		assert_eq!(payload.get("exp").unwrap(), 1300819380);
+		assert_eq!(payload.get("http://example.com/is_root").unwrap(), true);
 	}
 
 	#[test]

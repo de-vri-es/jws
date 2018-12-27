@@ -15,6 +15,8 @@ pub use serde_json::Value as JsonValue;
 pub use crate::error::{Error, Result};
 pub use crate::header::{AvailableHeaders, HeaderMap, Headers, HeadersMut};
 
+pub type JsonObject = std::collections::BTreeMap<String, JsonValue>;
+
 /// A verifier for JWS messages.
 pub trait Verifier {
 	/// Verify the signature of a JWS message.
