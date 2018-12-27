@@ -6,6 +6,7 @@ use crate::{
 	AvailableHeaders,
 	Error,
 	HeaderMap,
+	JsonObject,
 	JsonValue,
 	Result,
 	Signer,
@@ -45,18 +46,26 @@ pub struct Message {
 /// An encoded JWS Compact Serialization message without signature.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EncodedMessage {
-	data          : Vec<u8>,
+	data          : String,
 	header_length : usize,
 }
 /// An encoded JWS Compact Serialization message with signature.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EncodedSignedMessage {
-	data           : Vec<u8>,
+	data           : String,
 	header_length  : usize,
 	payload_length : usize,
 }
 
 impl Message {
+	/// Create a new message from a header and a payload.
+	pub fn new<Header, Payload>(header: Header, payload: Payload) -> Self where
+		JsonObject: From<Header>,
+		JsonValue: From<Payload>,
+	{
+		Self{header: header.into(), payload: payload.into()}
+	}
+
 	/// Create a new Message by decoding the header and payload of a JWS Compact Serialization message.
 	pub fn decode_header_payload(header: &[u8], payload: &[u8]) -> Result<Self> {
 		// Undo base64 encoding of parts.
@@ -86,7 +95,7 @@ impl Message {
 		buffer.push('.');
 		base64::encode_config_buf(&payload_json, base64::URL_SAFE_NO_PAD, &mut buffer);
 
-		EncodedMessage{data: buffer.into_bytes(), header_length}
+		EncodedMessage{data: buffer, header_length}
 	}
 
 	/// Encode and sign the message.
@@ -96,15 +105,15 @@ impl Message {
 		let encoded = self.encode();
 
 		// Sign the encoded message.
-		let mut signature = signer.compute_mac(encoded.header(), encoded.payload())?;
+		let signature = signer.compute_mac(encoded.header().as_bytes(), encoded.payload().as_bytes())?;
 
 		// Concat the signature to the encoded message.
 		let header_length  = encoded.header().len();
 		let payload_length = encoded.payload().len();
 		let mut data       = encoded.into_data();
-		data.reserve(signature.len() + 1);
-		data.push(b'.');
-		data.append(&mut signature);
+		data.reserve(base64_len(signature.len()) + 1);
+		data.push('.');
+		base64::encode_config_buf(&signature, base64::URL_SAFE_NO_PAD, &mut data);
 
 		Ok(EncodedSignedMessage{data, header_length, payload_length})
 	}
@@ -112,58 +121,58 @@ impl Message {
 
 impl EncodedMessage {
 	/// Get a reference to the raw data.
-	pub fn data(&self) -> &[u8] {
+	pub fn data(&self) -> &str {
 		&self.data
 	}
 
 	/// Get the raw data, consuming the encoded message.
-	pub fn into_data(self) -> Vec<u8> {
+	pub fn into_data(self) -> String {
 		self.data
 	}
 
 	/// Get the header part of the encoded message.
-	pub fn header(&self) -> &[u8] {
+	pub fn header(&self) -> &str {
 		&self.data[..self.header_length]
 	}
 
 	/// Get the payload part of the encoded message.
-	pub fn payload(&self) -> &[u8] {
+	pub fn payload(&self) -> &str {
 		&self.data[self.header_length + 1..]
 	}
 }
 
 impl EncodedSignedMessage {
 	/// Get a reference to the raw data.
-	pub fn data(&self) -> &[u8] {
+	pub fn data(&self) -> &str {
 		&self.data
 	}
 
 	/// Get the raw data, consuming the encoded message.
-	pub fn into_data(self) -> Vec<u8> {
+	pub fn into_data(self) -> String {
 		self.data
 	}
 
 	/// Get the header part of the encoded message.
-	pub fn header(&self) -> &[u8] {
+	pub fn header(&self) -> &str {
 		&self.data[..self.header_length]
 	}
 
 	/// Get the payload part of the encoded message.
-	pub fn payload(&self) -> &[u8] {
+	pub fn payload(&self) -> &str {
 		&self.data[self.payload_start()..self.payload_end()]
 	}
 
 	/// Get the signature part of the encoded message.
-	pub fn signature(&self) -> &[u8] {
+	pub fn signature(&self) -> &str {
 		&self.data[self.signature_start()..]
 	}
 
 	/// Get the parts of the message as a [`CompactSerializedParts`] struct.
 	pub fn parts(&self) -> CompactSerializedParts {
 		CompactSerializedParts {
-			header:    self.header(),
-			payload:   self.payload(),
-			signature: self.signature(),
+			header:    self.header().as_bytes(),
+			payload:   self.payload().as_bytes(),
+			signature: self.signature().as_bytes(),
 		}
 	}
 
@@ -246,7 +255,6 @@ fn decode_json<'a, T: serde::Deserialize<'a>>(value: &'a [u8], field_name: &str)
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::JsonObject;
 
 	fn test_split_valid(source: &[u8], header: &[u8], payload: &[u8], signature: &[u8]) {
 		let parts = split_encoded_parts(source).unwrap();
@@ -326,5 +334,16 @@ mod test {
 		assert_eq!(payload.get("http://example.com/is_root").unwrap(), true);
 
 		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
+	}
+
+	#[test]
+	fn test_encode() {
+		use serde_json::json;
+		let header  = serde_json::from_value(json!({"typ": "JWT", "alg": "HS256"})).unwrap();
+		let message = Message::new(header, "foo");
+		let encoded = message.encode();
+		assert_eq!(encoded.header(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+		assert_eq!(encoded.payload(), "ImZvbyI");
+		assert_eq!(encoded.data(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ImZvbyI")
 	}
 }
