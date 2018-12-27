@@ -92,7 +92,8 @@ fn verify_mac(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], m
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::{compact, JsonObject};
+	use crate::{compact};
+	use serde_json::json;
 
 	// Example taken from RFC 7515 appendix A.1
 	// https://tools.ietf.org/html/rfc7515#appendix-A.1
@@ -117,14 +118,17 @@ mod test {
 	#[test]
 	fn test_decode_verify() {
 		let message = compact::decode_verify(RFC7515_A1_ENCODED, HmacVerifier::new(RFC7515_A1_KEY)).unwrap();
-		assert_eq!(message.header.get("alg").unwrap(), "HS256");
-		assert_eq!(message.header.get("typ").unwrap(), "JWT");
-		assert_eq!(message.header.len(), 2);
 
-		let payload : JsonObject = serde_json::from_value(message.payload).unwrap();
-		assert_eq!(payload.get("iss").unwrap(), "joe");
-		assert_eq!(payload.get("exp").unwrap(), 1300819380);
-		assert_eq!(payload.get("http://example.com/is_root").unwrap(), true);
+		assert_eq!(message.header, serde_json::from_value(json!({
+			"alg": "HS256",
+			"typ": "JWT",
+		})).unwrap());
+
+		assert_eq!(message.payload, json!({
+			"iss": "joe",
+			"exp": 1300819380,
+			"http://example.com/is_root": true,
+		}));
 	}
 
 	#[test]

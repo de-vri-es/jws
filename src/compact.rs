@@ -255,6 +255,7 @@ fn decode_json<'a, T: serde::Deserialize<'a>>(value: &'a [u8], field_name: &str)
 #[cfg(test)]
 mod test {
 	use super::*;
+	use serde_json::json;
 
 	fn test_split_valid(source: &[u8], header: &[u8], payload: &[u8], signature: &[u8]) {
 		let parts = split_encoded_parts(source).unwrap();
@@ -306,15 +307,16 @@ mod test {
 	fn test_decode() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED).unwrap().decode().unwrap();
 
-		// Check that the header contains exactly the two values we expect.
-		assert_eq!(message.header.get("alg").unwrap(), "HS256");
-		assert_eq!(message.header.get("typ").unwrap(), "JWT");
-		assert_eq!(message.header.len(), 2);
+		assert_eq!(message.header, serde_json::from_value(json!({
+			"alg": "HS256",
+			"typ": "JWT",
+		})).unwrap());
 
-		let payload : JsonObject = serde_json::from_value(message.payload).unwrap();
-		assert_eq!(payload.get("iss").unwrap(), "joe");
-		assert_eq!(payload.get("exp").unwrap(), 1300819380);
-		assert_eq!(payload.get("http://example.com/is_root").unwrap(), true);
+		assert_eq!(message.payload, json!({
+			"iss": "joe",
+			"exp": 1300819380,
+			"http://example.com/is_root": true,
+		}));
 
 		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
 	}
@@ -323,22 +325,22 @@ mod test {
 	fn test_decode_mangled() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED_MANGLED).unwrap().decode().unwrap();
 
-		// Check that the header contains exactly the two values we expect.
-		assert_eq!(message.header.get("alg").unwrap(), "HS256");
-		assert_eq!(message.header.get("typ").unwrap(), "JWT");
-		assert_eq!(message.header.len(), 2);
+		assert_eq!(message.header, serde_json::from_value(json!({
+			"alg": "HS256",
+			"typ": "JWT",
+		})).unwrap());
 
-		let payload : JsonObject = serde_json::from_value(message.payload).unwrap();
-		assert_eq!(payload.get("iss").unwrap(), "jse");
-		assert_eq!(payload.get("exp").unwrap(), 1300819380);
-		assert_eq!(payload.get("http://example.com/is_root").unwrap(), true);
+		assert_eq!(message.payload, json!({
+			"iss": "jse",
+			"exp": 1300819380,
+			"http://example.com/is_root": true,
+		}));
 
 		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
 	}
 
 	#[test]
 	fn test_encode() {
-		use serde_json::json;
 		let header  = serde_json::from_value(json!({"typ": "JWT", "alg": "HS256"})).unwrap();
 		let message = Message::new(header, "foo");
 		let encoded = message.encode();
