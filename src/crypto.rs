@@ -1,5 +1,6 @@
 //! [`Verifier`] and [`Signer`] implementations using rust-crypto.
 
+use crypto::digest::Digest;
 use crypto::mac::{Mac, MacResult};
 use crypto::hmac::{Hmac};
 use crypto::sha2;
@@ -10,7 +11,27 @@ pub struct HmacVerifier{
 	key: Vec<u8>,
 }
 
-pub struct MacSigner<M>(pub Hmac<M>);
+pub struct MacSigner<M>(pub M);
+
+/// Create a HMAC MacSigner for a given digest implementation.
+fn signer_hmac<D: Digest>(digest: D, key: &[u8]) -> MacSigner<Hmac<D>> {
+	MacSigner(Hmac::new(digest, key.into()))
+}
+
+/// Create a HS256 signer.
+pub fn signer_hs256(key: &[u8]) -> MacSigner<Hmac<sha2::Sha256>> {
+	signer_hmac(sha2::Sha256::new(), key)
+}
+
+/// Create a HS384 signer.
+pub fn signer_hs384(key: &[u8]) -> MacSigner<Hmac<sha2::Sha384>> {
+	signer_hmac(sha2::Sha384::new(), key)
+}
+
+/// Create a HS512 signer.
+pub fn signer_hs512(key: &[u8]) -> MacSigner<Hmac<sha2::Sha512>> {
+	signer_hmac(sha2::Sha512::new(), key)
+}
 
 impl HmacVerifier {
 	pub fn new<K>(key: K) -> Self where
@@ -37,7 +58,7 @@ impl Verifier for HmacVerifier {
 	}
 }
 
-impl Signer for MacSigner<sha2::Sha256> {
+impl Signer for MacSigner<Hmac<sha2::Sha256>> {
 	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
 		headers.insert("alg".to_string(), "HS256");
 		Ok(())
@@ -48,7 +69,7 @@ impl Signer for MacSigner<sha2::Sha256> {
 	}
 }
 
-impl Signer for MacSigner<sha2::Sha384> {
+impl Signer for MacSigner<Hmac<sha2::Sha384>> {
 	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
 		headers.insert("alg".to_string(), "HS384");
 		Ok(())
@@ -59,7 +80,7 @@ impl Signer for MacSigner<sha2::Sha384> {
 	}
 }
 
-impl Signer for MacSigner<sha2::Sha512> {
+impl Signer for MacSigner<Hmac<sha2::Sha512>> {
 	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
 		headers.insert("alg".to_string(), "HS512");
 		Ok(())
@@ -95,6 +116,10 @@ mod test {
 	use crate::{compact};
 	use serde_json::json;
 
+	macro_rules! json_object {
+		({ $($tokens:tt)* }) => { serde_json::from_value::<$crate::JsonObject>(json!({ $($tokens)* })).unwrap() };
+	}
+
 	// Example taken from RFC 7515 appendix A.1
 	// https://tools.ietf.org/html/rfc7515#appendix-A.1
 	//
@@ -119,10 +144,10 @@ mod test {
 	fn test_decode_verify() {
 		let message = compact::decode_verify(RFC7515_A1_ENCODED, HmacVerifier::new(RFC7515_A1_KEY)).unwrap();
 
-		assert_eq!(message.header, serde_json::from_value(json!({
+		assert_eq!(message.header, json_object!({
 			"alg": "HS256",
 			"typ": "JWT",
-		})).unwrap());
+		}));
 
 		assert_eq!(message.payload, json!({
 			"iss": "joe",
@@ -135,5 +160,39 @@ mod test {
 	fn test_decode_verify_invalid() {
 		let result = compact::decode_verify(RFC7515_A1_ENCODED_MANGLED, HmacVerifier::new(RFC7515_A1_KEY));
 		assert_eq!(result.err().unwrap().kind(), Error::InvalidSignature);
+	}
+
+	#[test]
+	fn test_encode_sign_hs256() {
+		let header       = serde_json::from_value(json!({"typ": "JWT"})).unwrap();
+		let mut message  = compact::Message::new(header, "foo");
+		let signed_hs256 = message.encode_sign(signer_hs256(b"secretkey")).unwrap();
+		let signed_hs384 = message.encode_sign(signer_hs384(b"secretkey")).unwrap();
+		let signed_hs512 = message.encode_sign(signer_hs512(b"secretkey")).unwrap();
+
+		// Test that the signed message can be decoded and verified with the right key.
+		let decoded_hs256 = compact::decode_verify(signed_hs256.as_bytes(), HmacVerifier::new(&b"secretkey"[..])).unwrap();
+		let decoded_hs384 = compact::decode_verify(signed_hs384.as_bytes(), HmacVerifier::new(&b"secretkey"[..])).unwrap();
+		let decoded_hs512 = compact::decode_verify(signed_hs512.as_bytes(), HmacVerifier::new(&b"secretkey"[..])).unwrap();
+
+		// Test that the decoded payload is still correct.
+		assert_eq!(decoded_hs256.payload, json!("foo"));
+		assert_eq!(decoded_hs384.payload, json!("foo"));
+		assert_eq!(decoded_hs512.payload, json!("foo"));
+
+		// Test that the decoded header is correct.
+		assert_eq!(decoded_hs256.header, json_object!({"typ": "JWT", "alg": "HS256"}));
+		assert_eq!(decoded_hs384.header, json_object!({"typ": "JWT", "alg": "HS384"}));
+		assert_eq!(decoded_hs512.header, json_object!({"typ": "JWT", "alg": "HS512"}));
+
+		// Test that the signed message can bot be verified with a wrong key.
+		assert_eq!(compact::decode_verify(signed_hs256.as_bytes(), HmacVerifier::new(&b"notthekey"[..])).err().unwrap().kind(), Error::InvalidSignature);
+		assert_eq!(compact::decode_verify(signed_hs384.as_bytes(), HmacVerifier::new(&b"notthekey"[..])).err().unwrap().kind(), Error::InvalidSignature);
+		assert_eq!(compact::decode_verify(signed_hs512.as_bytes(), HmacVerifier::new(&b"notthekey"[..])).err().unwrap().kind(), Error::InvalidSignature);
+
+		// Also test the raw encoded form, although that's not really part of the API guarantee.
+		assert_eq!(signed_hs256.data(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ImZvbyI.y9Bvl5HwWI5zCLMcBDLTlYD9OZ4m_dbQ-Ow4VauJRPU");
+		assert_eq!(signed_hs384.data(), "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.ImZvbyI.m3UtLo1QpfvOlABDm0TlU1hz_tZTi5SnH4KHCQo5l7N6ECiR1SiBZJAAtLwJo5Gu");
+		assert_eq!(signed_hs512.data(), "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.ImZvbyI.f7TMTJN17caxFxy_tHhdXomjpY4qhmll-uOVa4a616NDaB7xEpRXVoCJQE4oZb0az1EPH5_iFi8_WpPnkOKtkw");
 	}
 }

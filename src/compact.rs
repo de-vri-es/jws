@@ -99,7 +99,7 @@ impl Message {
 	}
 
 	/// Encode and sign the message.
-	pub fn encode_sign(&mut self, signer: &mut impl Signer) -> Result<EncodedSignedMessage> {
+	pub fn encode_sign(&mut self, mut signer: impl Signer) -> Result<EncodedSignedMessage> {
 		// Let the signer set the headers and encode the message.
 		signer.set_header_params(AvailableHeaders::ProtectedOnly(&mut self.header))?;
 		let encoded = self.encode();
@@ -130,6 +130,11 @@ impl EncodedMessage {
 		self.data
 	}
 
+	/// Get a reference to the raw data as bytes.
+	pub fn as_bytes(&self) -> &[u8] {
+		self.data().as_bytes()
+	}
+
 	/// Get the header part of the encoded message.
 	pub fn header(&self) -> &str {
 		&self.data[..self.header_length]
@@ -150,6 +155,11 @@ impl EncodedSignedMessage {
 	/// Get the raw data, consuming the encoded message.
 	pub fn into_data(self) -> String {
 		self.data
+	}
+
+	/// Get a reference to the raw data as bytes.
+	pub fn as_bytes(&self) -> &[u8] {
+		self.data().as_bytes()
 	}
 
 	/// Get the header part of the encoded message.
@@ -257,6 +267,10 @@ mod test {
 	use super::*;
 	use serde_json::json;
 
+	macro_rules! json_object {
+		({ $($tokens:tt)* }) => { serde_json::from_value::<$crate::JsonObject>(json!({ $($tokens)* })).unwrap() };
+	}
+
 	fn test_split_valid(source: &[u8], header: &[u8], payload: &[u8], signature: &[u8]) {
 		let parts = split_encoded_parts(source).unwrap();
 		assert_eq!(parts.header,    header);
@@ -307,10 +321,10 @@ mod test {
 	fn test_decode() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED).unwrap().decode().unwrap();
 
-		assert_eq!(message.header, serde_json::from_value(json!({
+		assert_eq!(message.header, json_object!({
 			"alg": "HS256",
 			"typ": "JWT",
-		})).unwrap());
+		}));
 
 		assert_eq!(message.payload, json!({
 			"iss": "joe",
@@ -325,10 +339,10 @@ mod test {
 	fn test_decode_mangled() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED_MANGLED).unwrap().decode().unwrap();
 
-		assert_eq!(message.header, serde_json::from_value(json!({
+		assert_eq!(message.header, json_object!({
 			"alg": "HS256",
 			"typ": "JWT",
-		})).unwrap());
+		}));
 
 		assert_eq!(message.payload, json!({
 			"iss": "jse",
@@ -341,7 +355,7 @@ mod test {
 
 	#[test]
 	fn test_encode() {
-		let header  = serde_json::from_value(json!({"typ": "JWT", "alg": "HS256"})).unwrap();
+		let header  = json_object!({"typ": "JWT", "alg": "HS256"});
 		let message = Message::new(header, "foo");
 		let encoded = message.encode();
 		assert_eq!(encoded.header(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
