@@ -1,6 +1,6 @@
 [package]
 name          = "jws"
-version       = "0.1.0"
+version       = "0.2.0"
 authors       = ["Maarten de Vries <maarten@de-vri.es>"]
 description   = "JSON Web Signature for Rust!"
 documentation = "http://docs/rs/jws/"
