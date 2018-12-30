@@ -1,50 +1,61 @@
 //! [`Verifier`] and [`Signer`] implementations using `rust-crypto`.
 
-use crypto::digest::Digest;
-use crypto::mac::{Mac, MacResult};
-use crypto::hmac::{Hmac};
-use crypto::sha2;
+use crypto_mac::{Mac, MacResult};
+use hmac::{Hmac};
 
 use crate::{Error, HeadersRef, HeadersMut, Result, Signer, Verifier};
 
+type HmacSha256 = Hmac<sha2::Sha256>;
+type HmacSha384 = Hmac<sha2::Sha384>;
+type HmacSha512 = Hmac<sha2::Sha512>;
+
 /// Message verifier that supports the HS256, HS384 and HS512 algorithms using `rust-crypto`.
-pub struct HmacVerifier{
-	key: Vec<u8>,
+///
+/// The wrapped key type may be anything that implements `AsRef<[u8]>`.
+/// You can use a `Vec<u8>` to have the verifier own the key,
+/// or a `&[u8]` to prevent copying the key more than necessary.
+pub struct HmacVerifier<Key: AsRef<[u8]>> {
+	key: Key,
 }
 
-/// Message signer that supports the HS256, HS384 and HS512 algorithms using `rust-crypto`.
-pub struct MacSigner<M>(pub M);
+/// Message signer using HMAC-SHA-256.
+pub struct Hs256Signer(HmacSha256);
 
-/// Create a HMAC MacSigner for a given digest implementation.
-fn signer_hmac<D: Digest>(digest: D, key: &[u8]) -> MacSigner<Hmac<D>> {
-	MacSigner(Hmac::new(digest, key))
-}
+/// Message signer using HMAC-SHA-384.
+pub struct Hs384Signer(HmacSha384);
 
-/// Create a HS256 signer.
-pub fn signer_hs256(key: &[u8]) -> MacSigner<Hmac<sha2::Sha256>> {
-	signer_hmac(sha2::Sha256::new(), key)
-}
+/// Message signer using HMAC-SHA-512.
+pub struct Hs512Signer(HmacSha512);
 
-/// Create a HS384 signer.
-pub fn signer_hs384(key: &[u8]) -> MacSigner<Hmac<sha2::Sha384>> {
-	signer_hmac(sha2::Sha384::new(), key)
-}
-
-/// Create a HS512 signer.
-pub fn signer_hs512(key: &[u8]) -> MacSigner<Hmac<sha2::Sha512>> {
-	signer_hmac(sha2::Sha512::new(), key)
-}
-
-impl HmacVerifier {
-	pub fn new<K>(key: K) -> Self where
-		Vec<u8>: From<K>,
-	{
-		Self{key: key.into()}
+impl<K: AsRef<[u8]>> HmacVerifier<K> {
+	pub fn new(key: K) -> Self {
+		Self{key}
 	}
 }
 
-impl Verifier for HmacVerifier {
-	/// Verify the signature of a JWS Compact Serialization message.
+impl Hs256Signer {
+	/// Create a HS256 signer.
+	pub fn new(key: &[u8]) -> Self {
+		Self(Hmac::new_varkey(key).unwrap())
+	}
+}
+
+impl Hs384Signer {
+	/// Create a HS384 signer.
+	pub fn new(key: &[u8]) -> Self {
+		Self(Hmac::new_varkey(key).unwrap())
+	}
+}
+
+impl Hs512Signer {
+	/// Create a HS512 signer.
+	pub fn new(key: &[u8]) -> Self {
+		Self(Hmac::new_varkey(key).unwrap())
+	}
+}
+
+impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
+	/// Verify the signature of a JWS message.
 	///
 	/// This function needs access to the decoded message headers in order to determine which MAC algorithm to use.
 	/// It also needs access to the raw encoded parts to verify the MAC.
@@ -52,64 +63,65 @@ impl Verifier for HmacVerifier {
 		let algorithm : &str = headers.deserialize_required("alg")?;
 
 		match algorithm {
-			"HS256" => verify_mac(encoded_header, encoded_payload, signature, &mut Hmac::new(sha2::Sha256::new(), &self.key)),
-			"HS384" => verify_mac(encoded_header, encoded_payload, signature, &mut Hmac::new(sha2::Sha384::new(), &self.key)),
-			"HS512" => verify_mac(encoded_header, encoded_payload, signature, &mut Hmac::new(sha2::Sha512::new(), &self.key)),
+			"HS256" => verify_mac(encoded_header, encoded_payload, signature, HmacSha256::new_varkey(self.key.as_ref()).unwrap()),
+			"HS384" => verify_mac(encoded_header, encoded_payload, signature, HmacSha384::new_varkey(self.key.as_ref()).unwrap()),
+			"HS512" => verify_mac(encoded_header, encoded_payload, signature, HmacSha512::new_varkey(self.key.as_ref()).unwrap()),
 			_       => Err(Error::unsupported_mac_algorithm(algorithm.to_string())),
 		}
 	}
 }
 
-impl Signer for MacSigner<Hmac<sha2::Sha256>> {
+impl Signer for Hs256Signer {
 	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
 		headers.insert("alg".to_string(), "HS256");
 		Ok(())
 	}
 
 	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		Ok(compute_mac(encoded_header, encoded_payload, &mut self.0).code().to_owned())
+		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
 	}
 }
 
-impl Signer for MacSigner<Hmac<sha2::Sha384>> {
+impl Signer for Hs384Signer {
 	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
 		headers.insert("alg".to_string(), "HS384");
 		Ok(())
 	}
 
 	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		Ok(compute_mac(encoded_header, encoded_payload, &mut self.0).code().to_owned())
+		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
 	}
 }
 
-impl Signer for MacSigner<Hmac<sha2::Sha512>> {
+impl Signer for Hs512Signer {
 	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
 		headers.insert("alg".to_string(), "HS512");
 		Ok(())
 	}
 
 	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		Ok(compute_mac(encoded_header, encoded_payload, &mut self.0).code().to_owned())
+		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
 	}
 }
 
-/// Compute the Message Authentication Code for the MAC function.
-fn compute_mac(encoded_header: &[u8], encoded_payload: &[u8], mac: &mut impl Mac) -> MacResult {
+/// Feed the encoded header and payload to a MAC in the proper format.
+fn feed_mac(encoded_header: &[u8], encoded_payload: &[u8], mac: &mut impl Mac) {
 	mac.reset();
 	mac.input(encoded_header);
 	mac.input(b".");
 	mac.input(encoded_payload);
+}
+
+/// Compute the Message Authentication Code for the MAC function.
+fn compute_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], mut mac: M) -> MacResult<M::OutputSize> {
+	feed_mac(encoded_header, encoded_payload, &mut mac);
 	mac.result()
 }
 
 /// Verify the signature of a JWS Compact Serialization message.
-fn verify_mac(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], mac: &mut impl Mac) -> Result<()> {
-	let digest = compute_mac(encoded_header, encoded_payload, mac);
-	if digest == MacResult::new(signature) {
-		Ok(())
-	} else {
-		Err(Error::invalid_signature(""))
-	}
+fn verify_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], mut mac: M) -> Result<()> {
+	feed_mac(encoded_header, encoded_payload, &mut mac);
+	mac.verify(signature).map_err(|_| Error::invalid_signature(""))
 }
 
 #[cfg(test)]
@@ -167,9 +179,9 @@ mod test {
 	#[test]
 	fn test_encode_sign_hmac_sha2() {
 		let header       = json_object!({"typ": "JWT"});
-		let signed_hs256 = compact::encode_sign(header.clone(), b"foo", signer_hs256(b"secretkey")).unwrap();
-		let signed_hs384 = compact::encode_sign(header.clone(), b"foo", signer_hs384(b"secretkey")).unwrap();
-		let signed_hs512 = compact::encode_sign(header.clone(), b"foo", signer_hs512(b"secretkey")).unwrap();
+		let signed_hs256 = compact::encode_sign(header.clone(), b"foo", Hs256Signer::new(b"secretkey")).unwrap();
+		let signed_hs384 = compact::encode_sign(header.clone(), b"foo", Hs384Signer::new(b"secretkey")).unwrap();
+		let signed_hs512 = compact::encode_sign(header.clone(), b"foo", Hs512Signer::new(b"secretkey")).unwrap();
 
 		// Test that the signed message can be decoded and verified with the right key.
 		let decoded_hs256 = compact::decode_verify(signed_hs256.as_bytes(), HmacVerifier::new(&b"secretkey"[..])).unwrap();
