@@ -1,4 +1,4 @@
-//! [`Verifier`] and [`Signer`] implementations using `rust-crypto`.
+//! HMAC [`Verifier`] and [`Signer`] implementations using [RustCrypto](https://github.com/RustCrypto).
 
 use crypto_mac::{Mac, MacResult};
 use hmac::{Hmac};
@@ -9,7 +9,7 @@ type HmacSha256 = Hmac<sha2::Sha256>;
 type HmacSha384 = Hmac<sha2::Sha384>;
 type HmacSha512 = Hmac<sha2::Sha512>;
 
-/// Message verifier that supports the HS256, HS384 and HS512 algorithms using `rust-crypto`.
+/// Message verifier that supports the HMAC-SHA-256, HMAC-SHA-384 and HMAC-SHA-512 algorithms using `rust-crypto`.
 ///
 /// The wrapped key type may be anything that implements `AsRef<[u8]>`.
 /// You can use a `Vec<u8>` to have the verifier own the key,
@@ -28,6 +28,7 @@ pub struct Hs384Signer(HmacSha384);
 pub struct Hs512Signer(HmacSha512);
 
 impl<K: AsRef<[u8]>> HmacVerifier<K> {
+	/// Create a new HMAC verifier using a specified key.
 	pub fn new(key: K) -> Self {
 		Self{key}
 	}

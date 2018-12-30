@@ -3,14 +3,14 @@
 //! Currently, encoding and decoding is available only for the JWS Compact Serialization scheme in the
 //! [`compact`] module.
 //!
-//! Signing and verifying is done through the [`Signer`] and [`Verifier`] traits,
-//! for which some implementations based on `rust-crypto` are available in the [`crypto`] module.
+//! Signing and verifying is done through the [`Signer`] and [`Verifier`] traits.
+//! The [`hmac`] module contains implementations for these traits that support the HMAC-SHA2 family of algorithms.
 //!
 //! # Example:
 //! ```
 //! use jws::{JsonObject, JsonValue};
 //! use jws::compact::{decode_verify, encode_sign};
-//! use jws::crypto::{Hs512Signer, HmacVerifier};
+//! use jws::hmac::{Hs512Signer, HmacVerifier};
 //!
 //! fn encode_decode() -> jws::Result<()> {
 //!   // Add custom header parameters.
@@ -33,7 +33,7 @@
 //! To sign and verify a message
 
 pub mod compact;
-pub mod crypto;
+pub mod hmac;
 mod error;
 pub mod header;
 
