@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 use crate::{
 	AvailableHeaders,
 	Error,
-	HeaderMap,
 	JsonObject,
 	JsonValue,
 	Result,
@@ -13,16 +12,55 @@ use crate::{
 	Verifier,
 };
 
+/// Encode a message using the JWS Compact Serialization scheme.
+pub fn encode(header: &JsonObject, payload: &[u8]) -> EncodedMessage {
+	// Serializing header can't fail since it's already a JSON object.
+	let header_json  = serde_json::to_vec(&header).unwrap();
+
+	let output_len = base64_len(header_json.len()) + base64_len(payload.len()) + 1;
+	let mut buffer = String::with_capacity(output_len);
+
+	base64::encode_config_buf(&header_json, base64::URL_SAFE_NO_PAD, &mut buffer);
+	let header_length = buffer.len();
+
+	buffer.push('.');
+	base64::encode_config_buf(&payload, base64::URL_SAFE_NO_PAD, &mut buffer);
+
+	EncodedMessage{data: buffer, header_length}
+}
+
+/// Encode and sign the message.
+pub fn encode_sign(header: JsonObject, payload: &[u8], mut signer: impl Signer) -> Result<EncodedSignedMessage> {
+	let mut header = header;
+
+	// Let the signer set the headers before encoding the message.
+	signer.set_header_params(AvailableHeaders::ProtectedOnly(&mut header))?;
+	let encoded = encode(&header, payload);
+
+	// Sign the encoded message.
+	let signature = signer.compute_mac(encoded.header().as_bytes(), encoded.payload().as_bytes())?;
+
+	// Concat the signature to the encoded message.
+	let header_length  = encoded.header().len();
+	let payload_length = encoded.payload().len();
+	let mut data       = encoded.into_data();
+	data.reserve(base64_len(signature.len()) + 1);
+	data.push('.');
+	base64::encode_config_buf(&signature, base64::URL_SAFE_NO_PAD, &mut data);
+
+	Ok(EncodedSignedMessage{data, header_length, payload_length})
+}
+
 /// Decode a JWS Compact Serialization message with signature from a byte slice.
 ///
 /// A JWS Compact message consists of a base64-url encoded header and payload and signature,
 /// separated by period '.' characters.
-pub fn decode(data: &[u8]) -> Result<(Message, Vec<u8>)> {
+pub fn decode(data: &[u8]) -> Result<(DecodedMessage, Vec<u8>)> {
 	split_encoded_parts(data)?.decode()
 }
 
 /// Decode and verify a JWS Compact Serialization message.
-pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<Message> {
+pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<DecodedMessage> {
 	let parts = split_encoded_parts(data)?;
 	let (message, signature) = parts.decode()?;
 	verifier.verify(AvailableHeaders::ProtectedOnly(&message.header), parts.header, parts.payload, &signature)?;
@@ -38,9 +76,9 @@ pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<Message
 /// Alternatively, you can call [`split_encoded_parts`], decode the parts and then use a [`Verifier`] manually.
 /// The latter allows you to access the decoded message, even if it's signature is invalid.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Message {
-	pub header  : HeaderMap,
-	pub payload : JsonValue,
+pub struct DecodedMessage {
+	pub header  : JsonObject,
+	pub payload : Vec<u8>,
 }
 
 /// An encoded JWS Compact Serialization message without signature.
@@ -57,72 +95,35 @@ pub struct EncodedSignedMessage {
 	payload_length : usize,
 }
 
-impl Message {
+impl DecodedMessage {
 	/// Create a new message from a header and a payload.
-	pub fn new<Header, Payload>(header: Header, payload: Payload) -> Self where
-		JsonObject: From<Header>,
-		JsonValue: From<Payload>,
-	{
+	pub fn new(header: impl Into<JsonObject>, payload: impl Into<Vec<u8>>) -> Self {
 		Self{header: header.into(), payload: payload.into()}
 	}
 
-	/// Parse the payload further, using serde.
-	///
-	/// The type must implement the [`serde::Deserialize`] trait
-	pub fn parse_payload<'de, T: serde::de::Deserialize<'de> + 'de>(&'de self) -> std::result::Result<T, serde_json::Error> {
-		T::deserialize(&self.payload)
-	}
-
-	/// Create a new Message by decoding the header and payload of a JWS Compact Serialization message.
-	pub fn decode_header_payload(header: &[u8], payload: &[u8]) -> Result<Self> {
+	/// Create a new DecodedMessage by decoding the header and payload of a JWS Compact Serialization message.
+	pub fn from_encoded_parts(header: &[u8], payload: &[u8]) -> Result<Self> {
 		// Undo base64 encoding of parts.
 		let header  = decode_base64_url(header,  "header")?;
 		let payload = decode_base64_url(payload, "payload")?;
 
-		// Decode the header and payload JSON.
-		let header:  BTreeMap<String, JsonValue> = decode_json(&header,  "header")?;
-		let payload: JsonValue                   = decode_json(&payload, "payload")?;
+		// Decode the header as JSON.
+		let header: BTreeMap<String, JsonValue> = decode_json(&header,  "header")?;
 
 		// Put the decoded parts back together.
 		Ok(Self{header, payload})
 	}
 
-	/// Encode the message using the JWS Compact Serialization scheme.
-	pub fn encode(&self) -> EncodedMessage {
-		// Serializing header can't fail since it's already a JSON object.
-		let header_json  = serde_json::to_vec(&self.header).unwrap();
-		let payload_json = serde_json::to_vec(&self.payload).unwrap();
-
-		let output_len = base64_len(header_json.len()) + base64_len(payload_json.len()) + 1;
-		let mut buffer = String::with_capacity(output_len);
-
-		base64::encode_config_buf(&header_json, base64::URL_SAFE_NO_PAD, &mut buffer);
-		let header_length = buffer.len();
-
-		buffer.push('.');
-		base64::encode_config_buf(&payload_json, base64::URL_SAFE_NO_PAD, &mut buffer);
-
-		EncodedMessage{data: buffer, header_length}
+	/// Parse the payload as JSON using serde.
+	///
+	/// The type must implement the [`serde::Deserialize`] trait
+	pub fn parse_json<'de, T: serde::de::Deserialize<'de> + 'de>(&'de self) -> std::result::Result<T, serde_json::Error> {
+		serde_json::from_slice(&self.payload)
 	}
 
-	/// Encode and sign the message.
-	pub fn encode_sign(&mut self, mut signer: impl Signer) -> Result<EncodedSignedMessage> {
-		// Let the signer set the headers and encode the message.
-		signer.set_header_params(AvailableHeaders::ProtectedOnly(&mut self.header))?;
-		let encoded = self.encode();
-
-		// Sign the encoded message.
-		let signature = signer.compute_mac(encoded.header().as_bytes(), encoded.payload().as_bytes())?;
-
-		// Concat the signature to the encoded message.
-		let header_length  = encoded.header().len();
-		let payload_length = encoded.payload().len();
-		let mut data       = encoded.into_data();
-		data.reserve(base64_len(signature.len()) + 1);
-		data.push('.');
-		base64::encode_config_buf(&signature, base64::URL_SAFE_NO_PAD, &mut data);
-
-		Ok(EncodedSignedMessage{data, header_length, payload_length})
+	/// Parse the payload as a [`serde_json::Value`].
+	pub fn parse_json_value(&self) -> std::result::Result<JsonValue, serde_json::Error> {
+		self.parse_json()
 	}
 }
 
@@ -216,8 +217,8 @@ pub struct CompactSerializedParts<'a> {
 
 impl<'a> CompactSerializedParts<'a> {
 	/// Decode the already-split parts of a JWS Compact Serialization message.
-	pub fn decode(&self) -> Result<(Message, Vec<u8>)> {
-		let message   = Message::decode_header_payload(self.header, self.payload)?;
+	pub fn decode(&self) -> Result<(DecodedMessage, Vec<u8>)> {
+		let message   = DecodedMessage::from_encoded_parts(self.header, self.payload)?;
 		let signature = decode_base64_url(self.signature, "signature")?;
 		Ok((message, signature))
 	}
@@ -333,7 +334,7 @@ mod test {
 			"typ": "JWT",
 		}));
 
-		assert_eq!(message.payload, json!({
+		assert_eq!(message.parse_json_value().unwrap(), json!({
 			"iss": "joe",
 			"exp": 1300819380,
 			"http://example.com/is_root": true,
@@ -351,7 +352,7 @@ mod test {
 			"typ": "JWT",
 		}));
 
-		assert_eq!(message.payload, json!({
+		assert_eq!(message.parse_json_value().unwrap(), json!({
 			"iss": "jse",
 			"exp": 1300819380,
 			"http://example.com/is_root": true,
@@ -363,10 +364,9 @@ mod test {
 	#[test]
 	fn test_encode() {
 		let header  = json_object!({"typ": "JWT", "alg": "HS256"});
-		let message = Message::new(header, "foo");
-		let encoded = message.encode();
+		let encoded = encode(&header, b"foo");
 		assert_eq!(encoded.header(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
-		assert_eq!(encoded.payload(), "ImZvbyI");
-		assert_eq!(encoded.data(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ImZvbyI")
+		assert_eq!(encoded.payload(), "Zm9v");
+		assert_eq!(encoded.data(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.Zm9v")
 	}
 }

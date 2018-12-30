@@ -149,7 +149,7 @@ mod test {
 			"typ": "JWT",
 		}));
 
-		assert_eq!(message.payload, json!({
+		assert_eq!(message.parse_json_value().unwrap(), json!({
 			"iss": "joe",
 			"exp": 1300819380,
 			"http://example.com/is_root": true,
@@ -163,12 +163,11 @@ mod test {
 	}
 
 	#[test]
-	fn test_encode_sign_hs256() {
-		let header       = serde_json::from_value(json!({"typ": "JWT"})).unwrap();
-		let mut message  = compact::Message::new(header, "foo");
-		let signed_hs256 = message.encode_sign(signer_hs256(b"secretkey")).unwrap();
-		let signed_hs384 = message.encode_sign(signer_hs384(b"secretkey")).unwrap();
-		let signed_hs512 = message.encode_sign(signer_hs512(b"secretkey")).unwrap();
+	fn test_encode_sign_hmac_sha2() {
+		let header       = json_object!({"typ": "JWT"});
+		let signed_hs256 = compact::encode_sign(header.clone(), b"foo", signer_hs256(b"secretkey")).unwrap();
+		let signed_hs384 = compact::encode_sign(header.clone(), b"foo", signer_hs384(b"secretkey")).unwrap();
+		let signed_hs512 = compact::encode_sign(header.clone(), b"foo", signer_hs512(b"secretkey")).unwrap();
 
 		// Test that the signed message can be decoded and verified with the right key.
 		let decoded_hs256 = compact::decode_verify(signed_hs256.as_bytes(), HmacVerifier::new(&b"secretkey"[..])).unwrap();
@@ -176,9 +175,9 @@ mod test {
 		let decoded_hs512 = compact::decode_verify(signed_hs512.as_bytes(), HmacVerifier::new(&b"secretkey"[..])).unwrap();
 
 		// Test that the decoded payload is still correct.
-		assert_eq!(decoded_hs256.payload, json!("foo"));
-		assert_eq!(decoded_hs384.payload, json!("foo"));
-		assert_eq!(decoded_hs512.payload, json!("foo"));
+		assert_eq!(decoded_hs256.payload, b"foo");
+		assert_eq!(decoded_hs384.payload, b"foo");
+		assert_eq!(decoded_hs512.payload, b"foo");
 
 		// Test that the decoded header is correct.
 		assert_eq!(decoded_hs256.header, json_object!({"typ": "JWT", "alg": "HS256"}));
@@ -191,8 +190,8 @@ mod test {
 		assert_eq!(compact::decode_verify(signed_hs512.as_bytes(), HmacVerifier::new(&b"notthekey"[..])).err().unwrap().kind(), Error::InvalidSignature);
 
 		// Also test the raw encoded form, although that's not really part of the API guarantee.
-		assert_eq!(signed_hs256.data(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ImZvbyI.y9Bvl5HwWI5zCLMcBDLTlYD9OZ4m_dbQ-Ow4VauJRPU");
-		assert_eq!(signed_hs384.data(), "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.ImZvbyI.m3UtLo1QpfvOlABDm0TlU1hz_tZTi5SnH4KHCQo5l7N6ECiR1SiBZJAAtLwJo5Gu");
-		assert_eq!(signed_hs512.data(), "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.ImZvbyI.f7TMTJN17caxFxy_tHhdXomjpY4qhmll-uOVa4a616NDaB7xEpRXVoCJQE4oZb0az1EPH5_iFi8_WpPnkOKtkw");
+		assert_eq!(signed_hs256.data(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.Zm9v.4o4hfsHG_tN4bMqxCi0CYt-OArTTogFmgZuN54HS7ZY");
+		assert_eq!(signed_hs384.data(), "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.Zm9v.OoAr5wyN5KnBRY0OFYCqsk1mHrxuR_Lot33HVV43udouF1wlD1lvXL2oINrGU-9v");
+		assert_eq!(signed_hs512.data(), "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.Zm9v.Al1_vJpGnm78IRKDm48NkAoYkpR4KE1hA5jN09_QnGktPKgP4QB7MJnXgeXuC5E6BVlOp7oaR-FSphbq206vxA");
 	}
 }
