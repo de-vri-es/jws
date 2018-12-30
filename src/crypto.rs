@@ -15,7 +15,7 @@ pub struct MacSigner<M>(pub M);
 
 /// Create a HMAC MacSigner for a given digest implementation.
 fn signer_hmac<D: Digest>(digest: D, key: &[u8]) -> MacSigner<Hmac<D>> {
-	MacSigner(Hmac::new(digest, key.into()))
+	MacSigner(Hmac::new(digest, key))
 }
 
 /// Create a HS256 signer.
