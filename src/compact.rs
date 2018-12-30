@@ -1,4 +1,11 @@
 //! JWS Compact Serialization implementaton.
+//!
+//! This module contains types and functions to encode/decode
+//! and sign/verify messages encoded with the JWS Compact Serialization Scheme
+//! as defined in [RFC 1715](https://tools.ietf.org/html/rfc7515).
+//!
+//! Most applications should use [`encode_sign`](fn.encode_sign.html) and [`decode_verify`](fn.decode_verify.html).
+//! These functions combine encoding and signing or decoding and verifying in a single step.
 
 use std::collections::BTreeMap;
 
@@ -13,6 +20,11 @@ use crate::{
 };
 
 /// Encode a message using the JWS Compact Serialization scheme.
+///
+/// Note that the signer should already have added it's parameters to the header.
+/// If added later, they will not be part of the encoded message.
+///
+/// See [`encode_sign`] for an easier way to make sure the message is encoded with the right header parameters added.
 pub fn encode(header: &JsonObject, payload: &[u8]) -> EncodedMessage {
 	// Serializing header can't fail since it's already a JSON object.
 	let header_json  = serde_json::to_vec(&header).unwrap();
@@ -30,6 +42,11 @@ pub fn encode(header: &JsonObject, payload: &[u8]) -> EncodedMessage {
 }
 
 /// Encode and sign the message.
+///
+/// This function will first use to [`crate::Signer`] to add header parameters to the header,
+/// then encode the message and finally sign it.
+///
+/// Using this function ensures that the header parameters are set correctly before encoding/signing.
 pub fn encode_sign(header: JsonObject, payload: &[u8], mut signer: impl Signer) -> Result<EncodedSignedMessage> {
 	let mut header = header;
 
@@ -53,13 +70,16 @@ pub fn encode_sign(header: JsonObject, payload: &[u8], mut signer: impl Signer) 
 
 /// Decode a JWS Compact Serialization message with signature from a byte slice.
 ///
-/// A JWS Compact message consists of a base64-url encoded header and payload and signature,
-/// separated by period '.' characters.
-pub fn decode(data: &[u8]) -> Result<(DecodedMessage, Vec<u8>)> {
+/// This function is marked unsafe because it does not verify the message signature.
+/// You can use [`decode_verify`] as a safe alternative.
+pub unsafe fn decode(data: &[u8]) -> Result<(DecodedMessage, Vec<u8>)> {
 	split_encoded_parts(data)?.decode()
 }
 
 /// Decode and verify a JWS Compact Serialization message.
+///
+/// Note that if verification fails, you will not have access to the decoded message.
+/// If that is required, you may use [`split_encoded_parts`] and decode/verify the message manually.
 pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<DecodedMessage> {
 	let parts = split_encoded_parts(data)?;
 	let (message, signature) = parts.decode()?;

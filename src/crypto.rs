@@ -1,16 +1,18 @@
-//! [`Verifier`] and [`Signer`] implementations using rust-crypto.
+//! [`Verifier`] and [`Signer`] implementations using `rust-crypto`.
 
 use crypto::digest::Digest;
 use crypto::mac::{Mac, MacResult};
 use crypto::hmac::{Hmac};
 use crypto::sha2;
 
-use crate::{Error, Headers, HeadersMut, Result, Signer, Verifier};
+use crate::{Error, HeadersRef, HeadersMut, Result, Signer, Verifier};
 
+/// Message verifier that supports the HS256, HS384 and HS512 algorithms using `rust-crypto`.
 pub struct HmacVerifier{
 	key: Vec<u8>,
 }
 
+/// Message signer that supports the HS256, HS384 and HS512 algorithms using `rust-crypto`.
 pub struct MacSigner<M>(pub M);
 
 /// Create a HMAC MacSigner for a given digest implementation.
@@ -46,7 +48,7 @@ impl Verifier for HmacVerifier {
 	///
 	/// This function needs access to the decoded message headers in order to determine which MAC algorithm to use.
 	/// It also needs access to the raw encoded parts to verify the MAC.
-	fn verify(&mut self, headers: Headers, encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
+	fn verify(&mut self, headers: HeadersRef, encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
 		let algorithm : &str = headers.deserialize_required("alg")?;
 
 		match algorithm {

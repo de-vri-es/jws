@@ -1,12 +1,9 @@
 //! Types for working with message headers.
 
-use crate::{JsonValue, Result};
+use crate::{JsonObject, JsonValue, Result};
 use crate::error::Error;
 
-/// A JWS message header.
-pub type HeaderMap = std::collections::BTreeMap<String, JsonValue>;
-
-/// The available message headers.
+/// Available message headers (protected, unprotected or borth).
 ///
 /// The message might have a protected header and/or an unprotected header.
 /// However, it must always have atleast one of the two.
@@ -17,21 +14,15 @@ pub enum AvailableHeaders<T> {
 	UnprotectedOnly(T),
 }
 
-pub type Headers<'a>    = AvailableHeaders<&'a     HeaderMap>;
-pub type HeadersMut<'a> = AvailableHeaders<&'a mut HeaderMap>;
+/// References to the headers of a message.
+pub type HeadersRef<'a> = AvailableHeaders<&'a JsonObject>;
 
-impl<'a, T> std::ops::Deref for AvailableHeaders<&'a mut T> {
-	type Target = AvailableHeaders<&'a T>;
+/// Mutable references to the headers of a message.
+pub type HeadersMut<'a> = AvailableHeaders<&'a mut JsonObject>;
 
-	fn deref(&self) -> &Self::Target {
-		// We're only changing the reference from mut to not mut, so should be safe.
-		unsafe { &*(self as *const AvailableHeaders<&'a mut T> as *const AvailableHeaders<&'a T>) }
-	}
-}
-
-impl<'a> Headers<'a> {
+impl<'a> HeadersRef<'a> {
 	/// Get the protected header, if it is available.
-	pub fn protected(&self) -> Option<&'a HeaderMap> {
+	pub fn protected(&self) -> Option<&'a JsonObject> {
 		match *self {
 			AvailableHeaders::Both{protected, ..}      => Some(protected),
 			AvailableHeaders::ProtectedOnly(protected) => Some(protected),
@@ -40,7 +31,7 @@ impl<'a> Headers<'a> {
 	}
 
 	/// Get the unprotected header, if it is available.
-	pub fn unprotected(&self) -> Option<&'a HeaderMap> {
+	pub fn unprotected(&self) -> Option<&'a JsonObject> {
 		match *self {
 			AvailableHeaders::Both{unprotected, ..}        => Some(unprotected),
 			AvailableHeaders::UnprotectedOnly(unprotected) => Some(unprotected),
@@ -79,6 +70,14 @@ impl<'a> Headers<'a> {
 }
 
 impl<'a> HeadersMut<'a> {
+	pub fn into_ref(self) -> HeadersRef<'a> {
+		match self {
+			AvailableHeaders::Both{protected, unprotected} => AvailableHeaders::Both{protected, unprotected},
+			AvailableHeaders::ProtectedOnly(protected)     => AvailableHeaders::ProtectedOnly(protected),
+			AvailableHeaders::UnprotectedOnly(unprotected) => AvailableHeaders::UnprotectedOnly(unprotected),
+		}
+	}
+
 	/// Insert a value into either of the available headers.
 	///
 	/// If the protected header is available, the value is inserted into that one.

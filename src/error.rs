@@ -2,6 +2,7 @@
 
 use std::fmt;
 
+/// [`std::result::Result`] with the error type filled in.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Indicates the type of an error that can occur during JWS processing.
@@ -13,7 +14,7 @@ pub enum ErrorKind {
 	/// A header param was found but it's value is invalid.
 	InvalidHeaderParam,
 
-	/// The MAC algorithm indicates by the JWS header is not supported by the used [`Verifier`].
+	/// The MAC algorithm indicates by the JWS header is not supported by the used [`crate::Verifier`].
 	UnsupportedMacAlgorithm,
 
 	/// The message being processed is not valid.
