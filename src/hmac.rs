@@ -3,7 +3,7 @@
 use crypto_mac::{Mac, MacResult};
 use hmac::{Hmac};
 
-use crate::{Error, HeadersRef, HeadersMut, Result, Signer, Verifier};
+use crate::{Error, JsonObject, JsonValue, HeadersRef, Result, Signer, Verifier};
 
 type HmacSha256 = Hmac<sha2::Sha256>;
 type HmacSha384 = Hmac<sha2::Sha384>;
@@ -73,8 +73,8 @@ impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
 }
 
 impl Signer for Hs256Signer {
-	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
-		headers.insert("alg".to_string(), "HS256");
+	fn set_header_params(&mut self, header: &mut JsonObject) -> Result<()> {
+		header.insert("alg".to_string(), JsonValue::from("HS256"));
 		Ok(())
 	}
 
@@ -84,8 +84,8 @@ impl Signer for Hs256Signer {
 }
 
 impl Signer for Hs384Signer {
-	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
-		headers.insert("alg".to_string(), "HS384");
+	fn set_header_params(&mut self, header: &mut JsonObject) -> Result<()> {
+		header.insert("alg".to_string(), JsonValue::from("HS384"));
 		Ok(())
 	}
 
@@ -95,8 +95,8 @@ impl Signer for Hs384Signer {
 }
 
 impl Signer for Hs512Signer {
-	fn set_header_params(&mut self, mut headers: HeadersMut) -> Result<()> {
-		headers.insert("alg".to_string(), "HS512");
+	fn set_header_params(&mut self, header: &mut JsonObject) -> Result<()> {
+		header.insert("alg".to_string(), JsonValue::from("HS512"));
 		Ok(())
 	}
 

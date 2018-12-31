@@ -76,7 +76,7 @@ pub trait Signer {
 	/// Set the header parameters to indicate how the message should be verified.
 	///
 	/// This is the first step in the signing process, since the encoded headers will end up in the signature if they are added to the protected header.
-	fn set_header_params(&mut self, headers: HeadersMut) -> Result<()>;
+	fn set_header_params(&mut self, header: &mut JsonObject) -> Result<()>;
 
 	/// Compute the Message Authentication Code for the encoded protected header and encoded payload.
 	///
