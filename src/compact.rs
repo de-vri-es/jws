@@ -51,7 +51,7 @@ pub fn encode_sign(header: JsonObject, payload: &[u8], mut signer: impl Signer) 
 	let mut header = header;
 
 	// Let the signer set the headers before encoding the message.
-	signer.set_header_params(&mut header)?;
+	signer.set_header_params(&mut header);
 	let encoded = encode(&header, payload);
 
 	// Sign the encoded message.

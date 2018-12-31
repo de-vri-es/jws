@@ -56,10 +56,6 @@ impl Hs512Signer {
 }
 
 impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
-	/// Verify the signature of a JWS message.
-	///
-	/// This function needs access to the decoded message headers in order to determine which MAC algorithm to use.
-	/// It also needs access to the raw encoded parts to verify the MAC.
 	fn verify(&mut self, headers: HeadersRef, encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
 		let algorithm : &str = headers.deserialize_required("alg")?;
 
@@ -73,9 +69,8 @@ impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
 }
 
 impl Signer for Hs256Signer {
-	fn set_header_params(&mut self, header: &mut JsonObject) -> Result<()> {
+	fn set_header_params(&mut self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS256"));
-		Ok(())
 	}
 
 	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
@@ -84,9 +79,8 @@ impl Signer for Hs256Signer {
 }
 
 impl Signer for Hs384Signer {
-	fn set_header_params(&mut self, header: &mut JsonObject) -> Result<()> {
+	fn set_header_params(&mut self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS384"));
-		Ok(())
 	}
 
 	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
@@ -95,9 +89,8 @@ impl Signer for Hs384Signer {
 }
 
 impl Signer for Hs512Signer {
-	fn set_header_params(&mut self, header: &mut JsonObject) -> Result<()> {
+	fn set_header_params(&mut self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS512"));
-		Ok(())
 	}
 
 	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
