@@ -11,11 +11,13 @@ use crate::{Error, JsonObject, JsonValue, parse_required_header_param, Result, S
 ///
 /// The `none` algorithm has an empty signature and does not provide integrity protection.
 /// The verifier does check that the signature is indeed empty as required by [RFC 7518 (section 3.6)](https://tools.ietf.org/html/rfc7518#section-3.6).
+#[derive(Copy, Clone, Debug)]
 pub struct NoneVerifier;
 
 /// Message signer for the `none` algorithm.
 ///
 /// Adds an empty signature that does not provide integrity protection.
+#[derive(Copy, Clone, Debug)]
 pub struct NoneSigner;
 
 impl Verifier for NoneVerifier {

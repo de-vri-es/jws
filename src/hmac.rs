@@ -14,21 +14,25 @@ type HmacSha512 = Hmac<sha2::Sha512>;
 /// The wrapped key type may be anything that implements `AsRef<[u8]>`.
 /// You can use a `Vec<u8>` to have the verifier own the key,
 /// or a `&[u8]` to prevent copying the key more than necessary.
+#[derive(Clone, Debug)]
 pub struct HmacVerifier<Key: AsRef<[u8]>> {
 	key: Key,
 }
 
 /// Message signer using HMAC-SHA-256.
+#[derive(Clone, Debug)]
 pub struct Hs256Signer<Key: AsRef<[u8]>> {
 	key: Key,
 }
 
 /// Message signer using HMAC-SHA-384.
+#[derive(Clone, Debug)]
 pub struct Hs384Signer<Key: AsRef<[u8]>> {
 	key: Key,
 }
 
 /// Message signer using HMAC-SHA-512.
+#[derive(Clone, Debug)]
 pub struct Hs512Signer<Key: AsRef<[u8]>> {
 	key: Key,
 }
