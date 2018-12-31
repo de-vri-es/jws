@@ -3,7 +3,7 @@
 use crypto_mac::{Mac, MacResult};
 use hmac::{Hmac};
 
-use crate::{Error, JsonObject, JsonValue, HeadersRef, Result, Signer, Verifier};
+use crate::{Error, JsonObject, JsonValue, parse_required_header_param, Result, Signer, Verifier};
 
 type HmacSha256 = Hmac<sha2::Sha256>;
 type HmacSha384 = Hmac<sha2::Sha384>;
@@ -56,8 +56,8 @@ impl Hs512Signer {
 }
 
 impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
-	fn verify(&mut self, headers: HeadersRef, encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
-		let algorithm : &str = headers.deserialize_required("alg")?;
+	fn verify(&mut self, protected_header: Option<&JsonObject>, unprotected_header: Option<&JsonObject>, encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
+		let algorithm : &str = parse_required_header_param(protected_header, unprotected_header, "alg")?;
 
 		match algorithm {
 			"HS256" => verify_mac(encoded_header, encoded_payload, signature, HmacSha256::new_varkey(self.key.as_ref()).unwrap()),

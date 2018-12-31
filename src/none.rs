@@ -5,7 +5,7 @@
 //!
 //! It doesn't often make sense to use this "algorithm".
 
-use crate::{Error, JsonObject, JsonValue, HeadersRef, Result, Signer, Verifier};
+use crate::{Error, JsonObject, JsonValue, parse_required_header_param, Result, Signer, Verifier};
 
 /// Message verifier for the `none` algorithm.
 ///
@@ -18,10 +18,9 @@ pub struct NoneVerifier;
 /// Adds an empty signature that does not provide integrity protection.
 pub struct NoneSigner;
 
-
 impl Verifier for NoneVerifier {
-	fn verify(&mut self, headers: HeadersRef, _encoded_header: &[u8], _encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
-		let algorithm : &str = headers.deserialize_required("alg")?;
+	fn verify(&mut self, protected_header: Option<&JsonObject>, unprotected_header: Option<&JsonObject>, _encoded_header: &[u8], _encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
+		let algorithm : &str = parse_required_header_param(protected_header, unprotected_header, "alg")?;
 
 		if algorithm != "none" {
 			Err(Error::unsupported_mac_algorithm(algorithm))
@@ -46,7 +45,7 @@ impl Signer for NoneSigner {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::{AvailableHeaders, ErrorKind, json_object};
+	use crate::{ErrorKind, json_object};
 
 	#[test]
 	fn test_none_signer_header() {
@@ -69,19 +68,18 @@ mod test {
 	#[test]
 	fn test_verify_none() {
 		let header  = &json_object!{"alg": "none"};
-		let headers = AvailableHeaders::ProtectedOnly(header);
 		let mut verifier = NoneVerifier;
 
 		// Test that an empty signature is accepted.
-		verifier.verify(headers, b"fake_header", b"fake_payload", b"").unwrap();
-		verifier.verify(headers, b"fake_header", b"",             b"").unwrap();
-		verifier.verify(headers, b"",            b"fake_payload", b"").unwrap();
-		verifier.verify(headers, b"",            b"fake_payload", b"").unwrap();
+		verifier.verify(Some(header), None, b"fake_header", b"fake_payload", b"").unwrap();
+		verifier.verify(Some(header), None, b"fake_header", b"",             b"").unwrap();
+		verifier.verify(Some(header), None, b"",            b"fake_payload", b"").unwrap();
+		verifier.verify(Some(header), None, b"",            b"fake_payload", b"").unwrap();
 
 		// Test that a non-empty signature is rejected.
-		assert_eq!(verifier.verify(headers, b"fake_header", b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
-		assert_eq!(verifier.verify(headers, b"fake_header", b"",             b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
-		assert_eq!(verifier.verify(headers, b"",            b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
-		assert_eq!(verifier.verify(headers, b"",            b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
+		assert_eq!(verifier.verify(Some(header), None, b"fake_header", b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
+		assert_eq!(verifier.verify(Some(header), None, b"fake_header", b"",             b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
+		assert_eq!(verifier.verify(Some(header), None, b"",            b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
+		assert_eq!(verifier.verify(Some(header), None, b"",            b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
 	}
 }

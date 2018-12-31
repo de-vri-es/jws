@@ -36,11 +36,11 @@
 pub mod compact;
 pub mod hmac;
 mod error;
-pub mod header;
+mod header;
 pub mod none;
 
 pub use crate::error::{Error, ErrorKind, Result};
-pub use crate::header::{AvailableHeaders, HeadersRef, HeadersMut};
+pub use crate::header::{get_header_param, get_required_header_param, parse_required_header_param};
 
 /// Re-exported [`serde_json::Value`].
 pub type JsonValue  = serde_json::Value;
@@ -48,7 +48,7 @@ pub type JsonValue  = serde_json::Value;
 /// A JSON object.
 pub type JsonObject = std::collections::BTreeMap<String, JsonValue>;
 
-/// Create a JsonObject easily.
+/// Create a JSON object.
 ///
 /// This is similar to the [`serde_json::json`] macro,
 /// except that this macro always creates a JSON object, rather than a JSON value.
@@ -83,22 +83,25 @@ pub trait Verifier {
 	/// Verify the signature of a JWS message.
 	///
 	/// This function needs access to the decoded message headers in order to determine which MAC algorithm to use.
-	/// It also needs access to the raw encoded parts to verify the MAC.
+	/// It also needs access to the base64-url encoded parts to verify the signature.
 	///
-	/// If the signature is invalid, the function should return a `[error::InvalidSignature]` error.
+	/// If the signature is invalid, the function should return a [`Error::InvalidSignature`] error.
+	/// If the algorithm is not supported by the verifier, it should return a [`Error::UnsupportedMacAlgorithm`] error.
 	/// It may also report any of the other supported error variants.
 	///
 	/// # Args:
-	///   - headers:         The available message headers: the protected and/or unpprotected header.
-	///   - encoded_header:  The raw encoded protected header, needed to compute the MAC. If there is no protected header, this is an empty slice.
-	///   - encoded_payload: The raw encoded payload, needed to compute the MAC.
-	///   - signature:       The signature associated with the message, should be tested against the computed MAC.
+	///   - protected_header:   The parsed protected header, if any.
+	///   - unprotected_header: The parsed unprotected header, if any.
+	///   - encoded_header:     The base64-url encoded protected header, needed to compute the MAC. If there is no protected header, this is an empty slice.
+	///   - encoded_payload:    The base64-url encoded payload, needed to compute the MAC.
+	///   - signature:          The signature associated with the message, should be tested against the computed MAC.
 	fn verify(
 		&mut self,
-		headers          : HeadersRef,
-		encoded_header   : &[u8],
-		encoded_payload  : &[u8],
-		signature        : &[u8],
+		protected_header   : Option<&JsonObject>,
+		unprotected_header : Option<&JsonObject>,
+		encoded_header     : &[u8],
+		encoded_payload    : &[u8],
+		signature          : &[u8],
 	) -> Result<()>;
 }
 

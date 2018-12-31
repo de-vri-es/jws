@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 
 use crate::{
-	AvailableHeaders,
 	Error,
 	JsonObject,
 	JsonValue,
@@ -83,7 +82,7 @@ pub unsafe fn decode(data: &[u8]) -> Result<(DecodedMessage, Vec<u8>)> {
 pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<DecodedMessage> {
 	let parts = split_encoded_parts(data)?;
 	let (message, signature) = parts.decode()?;
-	verifier.verify(AvailableHeaders::ProtectedOnly(&message.header), parts.header, parts.payload, &signature)?;
+	verifier.verify(Some(&message.header), None, parts.header, parts.payload, &signature)?;
 	Ok(message)
 }
 
