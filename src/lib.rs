@@ -96,7 +96,7 @@ pub trait Verifier {
 	///   - encoded_payload:    The base64-url encoded payload, needed to compute the MAC.
 	///   - signature:          The signature associated with the message, should be tested against the computed MAC.
 	fn verify(
-		&mut self,
+		&self,
 		protected_header   : Option<&JsonObject>,
 		unprotected_header : Option<&JsonObject>,
 		encoded_header     : &[u8],
@@ -110,10 +110,10 @@ pub trait Signer {
 	/// Set the header parameters to indicate how the message should be verified.
 	///
 	/// This is the first step in the signing process, since the encoded headers will end up in the signature if they are added to the protected header.
-	fn set_header_params(&mut self, header: &mut JsonObject);
+	fn set_header_params(&self, header: &mut JsonObject);
 
 	/// Compute the Message Authentication Code for the encoded protected header and encoded payload.
 	///
 	/// The returned MAC must be plain bytes, not hex or base64 encoded.
-	fn compute_mac(&mut self, encoded_protected_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>>;
+	fn compute_mac(&self, encoded_protected_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>>;
 }

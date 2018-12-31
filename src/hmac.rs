@@ -34,29 +34,29 @@ impl<K: AsRef<[u8]>> HmacVerifier<K> {
 	}
 }
 
-impl Hs256Signer {
+impl<K: AsRef<[u8]>> Hs256Signer<K> {
 	/// Create a HS256 signer.
-	pub fn new(key: &[u8]) -> Self {
-		Self(Hmac::new_varkey(key).unwrap())
+	pub fn new(key: K) -> Self {
+		Self{key}
 	}
 }
 
-impl Hs384Signer {
+impl<K: AsRef<[u8]>> Hs384Signer<K> {
 	/// Create a HS384 signer.
-	pub fn new(key: &[u8]) -> Self {
-		Self(Hmac::new_varkey(key).unwrap())
+	pub fn new(key: K) -> Self {
+		Self{key}
 	}
 }
 
-impl Hs512Signer {
+impl<K: AsRef<[u8]>> Hs512Signer<K> {
 	/// Create a HS512 signer.
-	pub fn new(key: &[u8]) -> Self {
-		Self(Hmac::new_varkey(key).unwrap())
+	pub fn new(key: K) -> Self {
+		Self{key}
 	}
 }
 
 impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
-	fn verify(&mut self, protected_header: Option<&JsonObject>, unprotected_header: Option<&JsonObject>, encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
+	fn verify(&self, protected_header: Option<&JsonObject>, unprotected_header: Option<&JsonObject>, encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
 		let algorithm : &str = parse_required_header_param(protected_header, unprotected_header, "alg")?;
 
 		match algorithm {
@@ -69,31 +69,31 @@ impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
 }
 
 impl Signer for Hs256Signer {
-	fn set_header_params(&mut self, header: &mut JsonObject) {
+	fn set_header_params(&self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS256"));
 	}
 
-	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
+	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
 		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
 	}
 }
 
 impl Signer for Hs384Signer {
-	fn set_header_params(&mut self, header: &mut JsonObject) {
+	fn set_header_params(&self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS384"));
 	}
 
-	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
+	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
 		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
 	}
 }
 
 impl Signer for Hs512Signer {
-	fn set_header_params(&mut self, header: &mut JsonObject) {
+	fn set_header_params(&self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS512"));
 	}
 
-	fn compute_mac(&mut self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
+	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
 		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
 	}
 }

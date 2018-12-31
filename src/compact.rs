@@ -46,7 +46,7 @@ pub fn encode(header: &JsonObject, payload: &[u8]) -> EncodedMessage {
 /// then encode the message and finally sign it.
 ///
 /// Using this function ensures that the header parameters are set correctly before encoding/signing.
-pub fn encode_sign(header: JsonObject, payload: &[u8], mut signer: impl Signer) -> Result<EncodedSignedMessage> {
+pub fn encode_sign(header: JsonObject, payload: &[u8], signer: impl Signer) -> Result<EncodedSignedMessage> {
 	let mut header = header;
 
 	// Let the signer set the headers before encoding the message.
@@ -79,7 +79,7 @@ pub unsafe fn decode(data: &[u8]) -> Result<(DecodedMessage, Vec<u8>)> {
 ///
 /// Note that if verification fails, you will not have access to the decoded message.
 /// If that is required, you may use [`split_encoded_parts`] and decode/verify the message manually.
-pub fn decode_verify(data: &[u8], mut verifier: impl Verifier) -> Result<DecodedMessage> {
+pub fn decode_verify(data: &[u8], verifier: impl Verifier) -> Result<DecodedMessage> {
 	let parts = split_encoded_parts(data)?;
 	let (message, signature) = parts.decode()?;
 	verifier.verify(Some(&message.header), None, parts.header, parts.payload, &signature)?;

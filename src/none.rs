@@ -19,7 +19,7 @@ pub struct NoneVerifier;
 pub struct NoneSigner;
 
 impl Verifier for NoneVerifier {
-	fn verify(&mut self, protected_header: Option<&JsonObject>, unprotected_header: Option<&JsonObject>, _encoded_header: &[u8], _encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
+	fn verify(&self, protected_header: Option<&JsonObject>, unprotected_header: Option<&JsonObject>, _encoded_header: &[u8], _encoded_payload: &[u8], signature: &[u8]) -> Result<()> {
 		let algorithm : &str = parse_required_header_param(protected_header, unprotected_header, "alg")?;
 
 		if algorithm != "none" {
@@ -33,11 +33,11 @@ impl Verifier for NoneVerifier {
 }
 
 impl Signer for NoneSigner {
-	fn set_header_params(&mut self, header: &mut JsonObject) {
+	fn set_header_params(&self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("none"));
 	}
 
-	fn compute_mac(&mut self, _encoded_header: &[u8], _encoded_payload: &[u8]) -> Result<Vec<u8>> {
+	fn compute_mac(&self, _encoded_header: &[u8], _encoded_payload: &[u8]) -> Result<Vec<u8>> {
 		Ok(Vec::new())
 	}
 }
@@ -50,7 +50,7 @@ mod test {
 	#[test]
 	fn test_none_signer_header() {
 		let mut header = json_object!{};
-		let mut signer = NoneSigner;
+		let signer = NoneSigner;
 
 		signer.set_header_params(&mut header);
 		assert_eq!(header, json_object!{"alg": "none"});
@@ -58,7 +58,7 @@ mod test {
 
 	#[test]
 	fn test_none_signer_mac() {
-		let mut signer = NoneSigner;
+		let signer = NoneSigner;
 		assert_eq!(&signer.compute_mac(b"fake_header", b"fake_payload").unwrap(), b"");
 		assert_eq!(&signer.compute_mac(b"fake_header", b"").unwrap(),             b"");
 		assert_eq!(&signer.compute_mac(b"",            b"fake_payload").unwrap(), b"");
@@ -68,7 +68,7 @@ mod test {
 	#[test]
 	fn test_verify_none() {
 		let header  = &json_object!{"alg": "none"};
-		let mut verifier = NoneVerifier;
+		let verifier = NoneVerifier;
 
 		// Test that an empty signature is accepted.
 		verifier.verify(Some(header), None, b"fake_header", b"fake_payload", b"").unwrap();
