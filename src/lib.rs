@@ -1,4 +1,5 @@
-//! This library provides JSON Web Signature encoding, decoding, signing and verification.
+//! This library provides JSON Web Signature encoding, decoding, signing and verification
+//! as described in [RFC 7515](https://tools.ietf.org/html/rfc7515).
 //!
 //! Currently, encoding and decoding is available only for the JWS Compact Serialization scheme in the
 //! [`compact`] module.

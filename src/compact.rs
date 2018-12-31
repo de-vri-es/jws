@@ -2,7 +2,7 @@
 //!
 //! This module contains types and functions to encode/decode
 //! and sign/verify messages encoded with the JWS Compact Serialization Scheme
-//! as defined in [RFC 1715](https://tools.ietf.org/html/rfc7515).
+//! as defined in [RFC 1715 section 7.1](https://tools.ietf.org/html/rfc7515#section-7.1).
 //!
 //! Most applications should use [`encode_sign`](fn.encode_sign.html) and [`decode_verify`](fn.decode_verify.html).
 //! These functions combine encoding and signing or decoding and verifying in a single step.
