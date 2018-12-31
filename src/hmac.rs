@@ -19,13 +19,19 @@ pub struct HmacVerifier<Key: AsRef<[u8]>> {
 }
 
 /// Message signer using HMAC-SHA-256.
-pub struct Hs256Signer(HmacSha256);
+pub struct Hs256Signer<Key: AsRef<[u8]>> {
+	key: Key,
+}
 
 /// Message signer using HMAC-SHA-384.
-pub struct Hs384Signer(HmacSha384);
+pub struct Hs384Signer<Key: AsRef<[u8]>> {
+	key: Key,
+}
 
 /// Message signer using HMAC-SHA-512.
-pub struct Hs512Signer(HmacSha512);
+pub struct Hs512Signer<Key: AsRef<[u8]>> {
+	key: Key,
+}
 
 impl<K: AsRef<[u8]>> HmacVerifier<K> {
 	/// Create a new HMAC verifier using a specified key.
@@ -68,33 +74,36 @@ impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
 	}
 }
 
-impl Signer for Hs256Signer {
+impl<K: AsRef<[u8]>> Signer for Hs256Signer<K> {
 	fn set_header_params(&self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS256"));
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
+		let hmac = HmacSha256::new_varkey(self.key.as_ref()).unwrap();
+		Ok(compute_mac(encoded_header, encoded_payload, hmac).code().as_slice().to_owned())
 	}
 }
 
-impl Signer for Hs384Signer {
+impl<K: AsRef<[u8]>> Signer for Hs384Signer<K> {
 	fn set_header_params(&self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS384"));
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
+		let hmac = HmacSha384::new_varkey(self.key.as_ref()).unwrap();
+		Ok(compute_mac(encoded_header, encoded_payload, hmac).code().as_slice().to_owned())
 	}
 }
 
-impl Signer for Hs512Signer {
+impl<K: AsRef<[u8]>> Signer for Hs512Signer<K> {
 	fn set_header_params(&self, header: &mut JsonObject) {
 		header.insert("alg".to_string(), JsonValue::from("HS512"));
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		Ok(compute_mac(encoded_header, encoded_payload, self.0.clone()).code().as_slice().to_owned())
+		let hmac = HmacSha512::new_varkey(self.key.as_ref()).unwrap();
+		Ok(compute_mac(encoded_header, encoded_payload, hmac).code().as_slice().to_owned())
 	}
 }
 
