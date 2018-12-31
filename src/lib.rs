@@ -51,7 +51,7 @@ pub type JsonObject = std::collections::BTreeMap<String, JsonValue>;
 
 /// Create a JSON object.
 ///
-/// This is similar to the [`serde_json::json`] macro,
+/// This is similar to the `json` macro from serde,
 /// except that this macro always creates a JSON object, rather than a JSON value.
 ///
 /// # Example
