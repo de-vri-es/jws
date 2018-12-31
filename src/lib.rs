@@ -80,7 +80,7 @@ macro_rules! json_object {
 }
 
 /// A verifier for JWS messages.
-pub trait Verifier {
+pub trait Verifier: Sized {
 	/// Verify the signature of a JWS message.
 	///
 	/// This function needs access to the decoded message headers in order to determine which MAC algorithm to use.
@@ -104,10 +104,7 @@ pub trait Verifier {
 		encoded_payload    : &[u8],
 		signature          : &[u8],
 	) -> Result<()>;
-}
 
-/// Trait to add some additional members to sized Verifier implementations.
-pub trait VerifierExt: Verifier + Sized {
 	/// Create a new verifier that accepts a message if either this or the other verifier does.
 	fn or<Other: Verifier>(self, other: Other) -> combine::OrVerifier<Self, Other> {
 		combine::OrVerifier::new(self, other)
@@ -118,9 +115,6 @@ pub trait VerifierExt: Verifier + Sized {
 		combine::AndVerifier::new(self, other)
 	}
 }
-
-/// Implement VerifierExt for all sized Verifier implementations.
-impl<T: Verifier + Sized> VerifierExt for T {}
 
 /// A signer for JWS messages.
 pub trait Signer {
