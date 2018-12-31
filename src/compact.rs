@@ -141,8 +141,17 @@ impl DecodedMessage {
 		serde_json::from_slice(&self.payload)
 	}
 
-	/// Parse the payload as a [`serde_json::Value`].
+	/// Parse the payload as a [`JsonValue`].
+	///
+	/// This method avoids the need for type annotations.
 	pub fn parse_json_value(&self) -> std::result::Result<JsonValue, serde_json::Error> {
+		self.parse_json()
+	}
+
+	/// Parse the payload as a [`JsonObject`].
+	///
+	/// This method avoids the need for type annotations.
+	pub fn parse_json_object(&self) -> std::result::Result<JsonObject, serde_json::Error> {
 		self.parse_json()
 	}
 }
@@ -293,11 +302,7 @@ fn decode_json<'a, T: serde::Deserialize<'a>>(value: &'a [u8], field_name: &str)
 #[cfg(test)]
 mod test {
 	use super::*;
-	use serde_json::json;
-
-	macro_rules! json_object {
-		({ $($tokens:tt)* }) => { serde_json::from_value::<$crate::JsonObject>(json!({ $($tokens)* })).unwrap() };
-	}
+	use crate::json_object;
 
 	fn test_split_valid(source: &[u8], header: &[u8], payload: &[u8], signature: &[u8]) {
 		let parts = split_encoded_parts(source).unwrap();
@@ -349,16 +354,16 @@ mod test {
 	fn test_decode() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED).unwrap().decode().unwrap();
 
-		assert_eq!(message.header, json_object!({
+		assert_eq!(message.header, json_object!{
 			"alg": "HS256",
-			"typ": "JWT",
-		}));
+			"typ": "JWT"
+		});
 
-		assert_eq!(message.parse_json_value().unwrap(), json!({
+		assert_eq!(message.parse_json_object().unwrap(), json_object!{
 			"iss": "joe",
 			"exp": 1300819380,
 			"http://example.com/is_root": true,
-		}));
+		});
 
 		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
 	}
@@ -367,23 +372,23 @@ mod test {
 	fn test_decode_mangled() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED_MANGLED).unwrap().decode().unwrap();
 
-		assert_eq!(message.header, json_object!({
+		assert_eq!(message.header, json_object!{
 			"alg": "HS256",
 			"typ": "JWT",
-		}));
+		});
 
-		assert_eq!(message.parse_json_value().unwrap(), json!({
+		assert_eq!(message.parse_json_object().unwrap(), json_object!{
 			"iss": "jse",
 			"exp": 1300819380,
 			"http://example.com/is_root": true,
-		}));
+		});
 
 		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
 	}
 
 	#[test]
 	fn test_encode() {
-		let header  = json_object!({"typ": "JWT", "alg": "HS256"});
+		let header  = json_object!{"typ": "JWT", "alg": "HS256"};
 		let encoded = encode(&header, b"foo");
 		assert_eq!(encoded.header(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
 		assert_eq!(encoded.payload(), "Zm9v");

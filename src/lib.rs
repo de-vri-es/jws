@@ -47,6 +47,36 @@ pub type JsonValue  = serde_json::Value;
 /// A JSON object.
 pub type JsonObject = std::collections::BTreeMap<String, JsonValue>;
 
+/// Create a JsonObject easily.
+///
+/// This is similar to the [`serde_json::json`] macro,
+/// except that this macro always creates a JSON object, rather than a JSON value.
+///
+/// # Example
+/// ```
+/// # use jws::json_object;
+/// json_object!{
+///   "alg": "HS256",
+///   "typ": "jwt",
+/// };
+/// ```
+#[macro_export]
+macro_rules! json_object {
+	{} => { $crate::JsonObject::new() };
+
+	{ $( $name:tt : $value:expr, )+ } => {{
+		let mut object = $crate::JsonObject::new();
+		$(object.insert(String::from($name), $crate::JsonValue::from($value));)*
+		object
+	}};
+
+	{ $( $name:tt : $value:expr ),+ } => {{
+		let mut object = $crate::JsonObject::new();
+		$(object.insert(String::from($name), $crate::JsonValue::from($value));)*
+		object
+	}};
+}
+
 /// A verifier for JWS messages.
 pub trait Verifier {
 	/// Verify the signature of a JWS message.
