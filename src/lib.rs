@@ -31,7 +31,6 @@
 //! }
 //!
 //! ```
-//! To sign and verify a message
 
 pub mod compact;
 pub mod hmac;
