@@ -36,8 +36,8 @@ pub enum ErrorKind {
 /// It should not be used by error handling code to change handling logic.
 #[derive(Clone, Debug)]
 pub struct Error{
-	kind:    ErrorKind,
-	message: String,
+	pub kind:    ErrorKind,
+	pub message: String,
 }
 
 impl ErrorKind {

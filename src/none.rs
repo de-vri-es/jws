@@ -48,6 +48,7 @@ impl Signer for NoneSigner {
 mod test {
 	use super::*;
 	use crate::{ErrorKind, json_object};
+	use assert2::assert;
 
 	#[test]
 	fn test_none_signer_header() {
@@ -55,16 +56,16 @@ mod test {
 		let signer = NoneSigner;
 
 		signer.set_header_params(&mut header);
-		assert_eq!(header, json_object!{"alg": "none"});
+		assert!(header == json_object!{"alg": "none"});
 	}
 
 	#[test]
 	fn test_none_signer_mac() {
 		let signer = NoneSigner;
-		assert_eq!(&signer.compute_mac(b"fake_header", b"fake_payload").unwrap(), b"");
-		assert_eq!(&signer.compute_mac(b"fake_header", b"").unwrap(),             b"");
-		assert_eq!(&signer.compute_mac(b"",            b"fake_payload").unwrap(), b"");
-		assert_eq!(&signer.compute_mac(b"",            b"").unwrap(),             b"");
+		assert!(&signer.compute_mac(b"fake_header", b"fake_payload").unwrap() == b"");
+		assert!(&signer.compute_mac(b"fake_header", b"").unwrap() == b"");
+		assert!(&signer.compute_mac(b"",            b"fake_payload").unwrap() == b"");
+		assert!(&signer.compute_mac(b"",            b"").unwrap() == b"");
 	}
 
 	#[test]
@@ -73,15 +74,15 @@ mod test {
 		let verifier = NoneVerifier;
 
 		// Test that an empty signature is accepted.
-		verifier.verify(Some(header), None, b"fake_header", b"fake_payload", b"").unwrap();
-		verifier.verify(Some(header), None, b"fake_header", b"",             b"").unwrap();
-		verifier.verify(Some(header), None, b"",            b"fake_payload", b"").unwrap();
-		verifier.verify(Some(header), None, b"",            b"fake_payload", b"").unwrap();
+		assert!(let Ok(_) = verifier.verify(Some(header), None, b"fake_header", b"fake_payload", b""));
+		assert!(let Ok(_) = verifier.verify(Some(header), None, b"fake_header", b"",             b""));
+		assert!(let Ok(_) = verifier.verify(Some(header), None, b"",            b"fake_payload", b""));
+		assert!(let Ok(_) = verifier.verify(Some(header), None, b"",            b"fake_payload", b""));
 
 		// Test that a non-empty signature is rejected.
-		assert_eq!(verifier.verify(Some(header), None, b"fake_header", b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
-		assert_eq!(verifier.verify(Some(header), None, b"fake_header", b"",             b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
-		assert_eq!(verifier.verify(Some(header), None, b"",            b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
-		assert_eq!(verifier.verify(Some(header), None, b"",            b"fake_payload", b"bad-signature").err().unwrap().kind(), ErrorKind::InvalidSignature);
+		assert!(let Err(Error { kind: ErrorKind::InvalidSignature, .. }) = verifier.verify(Some(header), None, b"fake_header", b"fake_payload", b"bad-signature"));
+		assert!(let Err(Error { kind: ErrorKind::InvalidSignature, .. }) = verifier.verify(Some(header), None, b"fake_header", b"",             b"bad-signature"));
+		assert!(let Err(Error { kind: ErrorKind::InvalidSignature, .. }) = verifier.verify(Some(header), None, b"",            b"fake_payload", b"bad-signature"));
+		assert!(let Err(Error { kind: ErrorKind::InvalidSignature, .. }) = verifier.verify(Some(header), None, b"",            b"fake_payload", b"bad-signature"));
 	}
 }

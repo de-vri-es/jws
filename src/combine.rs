@@ -90,6 +90,8 @@ mod test {
 	use crate::{compact, json_object};
 	use crate::hmac::{HmacVerifier, Hs256Signer};
 
+	use assert2::assert;
+
 	#[test]
 	fn test_encode_sign_hmac_sha2() {
 		let header = json_object!{"typ": "JWT"};
@@ -103,22 +105,13 @@ mod test {
 		let wrong_and_right = verifier_wrong.clone().and(verifier_right.clone());
 		let right_and_right = verifier_right.clone().and(verifier_right.clone());
 
-		// Make sure the individual verifiers work as expected.
-		let wrong_result = compact::decode_verify(signed.as_bytes(), &verifier_wrong);
-		let right_result = compact::decode_verify(signed.as_bytes(), &verifier_right);
+		// Make sure the verifiers work as expected.
+		assert!(let Ok(_) = compact::decode_verify(signed.as_bytes(), &verifier_right));
+		assert!(let Ok(_) = compact::decode_verify(signed.as_bytes(), &wrong_or_right));
+		assert!(let Ok(_) = compact::decode_verify(signed.as_bytes(), &right_and_right));
 
-		let wrong_or_right_result = compact::decode_verify(signed.as_bytes(), &wrong_or_right);
-		let wrong_or_wrong_result = compact::decode_verify(signed.as_bytes(), &wrong_or_wrong);
-
-		let wrong_and_right_result = compact::decode_verify(signed.as_bytes(), &wrong_and_right);
-		let right_and_right_result = compact::decode_verify(signed.as_bytes(), &right_and_right);
-
-		right_result.expect("(right) verifies message");
-		wrong_or_right_result.expect("(wrong OR right) verifies message");
-		right_and_right_result.expect("(right AND right) verifies message");
-
-		assert_eq!(wrong_result.expect_err("(wrong) rejects message").kind(), Error::InvalidSignature);
-		assert_eq!(wrong_or_wrong_result.expect_err("(wrong OR wrong) rejects message").kind(), Error::InvalidSignature);
-		assert_eq!(wrong_and_right_result.expect_err("(wrong AND right) rejects message").kind(), Error::InvalidSignature);
+		assert!(let Err(Error { kind: Error::InvalidSignature, .. }) = compact::decode_verify(signed.as_bytes(), &verifier_wrong));
+		assert!(let Err(Error { kind: Error::InvalidSignature, .. }) = compact::decode_verify(signed.as_bytes(), &wrong_or_wrong));
+		assert!(let Err(Error { kind: Error::InvalidSignature, .. }) = compact::decode_verify(signed.as_bytes(), &wrong_and_right));
 	}
 }

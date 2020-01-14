@@ -303,11 +303,13 @@ mod test {
 	use super::*;
 	use crate::json_object;
 
+	use assert2::assert;
+
 	fn test_split_valid(source: &[u8], header: &[u8], payload: &[u8], signature: &[u8]) {
 		let parts = split_encoded_parts(source).unwrap();
-		assert_eq!(parts.header,    header);
-		assert_eq!(parts.payload,   payload);
-		assert_eq!(parts.signature, signature);
+		assert!(parts.header == header);
+		assert!(parts.payload == payload);
+		assert!(parts.signature == signature);
 
 	}
 
@@ -324,9 +326,9 @@ mod test {
 		test_split_valid(b"aap.noot.mies", b"aap", b"noot", b"mies");
 
 		// Test splitting some invalid sequences.
-		assert_eq!(split_encoded_parts(b"aapnootmies").err().unwrap().kind(), Error::InvalidMessage);
-		assert_eq!(split_encoded_parts(b"aap.nootmies").err().unwrap().kind(), Error::InvalidMessage);
-		assert_eq!(split_encoded_parts(b"aap.noot.mies.").err().unwrap().kind(), Error::InvalidMessage);
+		assert!(let Err(Error { kind: Error::InvalidMessage, .. }) = split_encoded_parts(b"aapnootmies"));
+		assert!(let Err(Error { kind: Error::InvalidMessage, .. }) = split_encoded_parts(b"aap.nootmies"));
+		assert!(let Err(Error { kind: Error::InvalidMessage, .. }) = split_encoded_parts(b"aap.noot.mies."));
 	}
 
 	// Example taken from RFC 7515 appendix A.1
@@ -353,44 +355,45 @@ mod test {
 	fn test_decode() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED).unwrap().decode().unwrap();
 
-		assert_eq!(message.header, json_object!{
+		assert!(&message.header == &json_object!{
 			"alg": "HS256",
 			"typ": "JWT"
 		});
 
-		assert_eq!(message.parse_json_object().unwrap(), json_object!{
+		assert!(let Ok(_) = message.parse_json_object());
+		assert!(message.parse_json_object().ok() == Some(json_object!{
 			"iss": "joe",
 			"exp": 1300819380,
 			"http://example.com/is_root": true,
-		});
+		}));
 
-		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
+		assert!(&signature[..] == RFC7515_A1_SIGNATURE);
 	}
 
 	#[test]
 	fn test_decode_mangled() {
 		let (message, signature) = split_encoded_parts(RFC7515_A1_ENCODED_MANGLED).unwrap().decode().unwrap();
 
-		assert_eq!(message.header, json_object!{
+		assert!(&message.header == &json_object!{
 			"alg": "HS256",
 			"typ": "JWT",
 		});
 
-		assert_eq!(message.parse_json_object().unwrap(), json_object!{
+		assert!(message.parse_json_object().unwrap() == json_object!{
 			"iss": "jse",
 			"exp": 1300819380,
 			"http://example.com/is_root": true,
 		});
 
-		assert_eq!(&signature[..], RFC7515_A1_SIGNATURE);
+		assert!(&signature[..] == RFC7515_A1_SIGNATURE);
 	}
 
 	#[test]
 	fn test_encode() {
 		let header  = json_object!{"typ": "JWT", "alg": "HS256"};
 		let encoded = encode(&header, b"foo");
-		assert_eq!(encoded.header(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
-		assert_eq!(encoded.payload(), "Zm9v");
-		assert_eq!(encoded.data(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.Zm9v")
+		assert!(encoded.header() == "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+		assert!(encoded.payload() == "Zm9v");
+		assert!(encoded.data() == "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.Zm9v")
 	}
 }
