@@ -69,9 +69,23 @@ pub fn encode_sign(header: JsonObject, payload: &[u8], signer: &impl Signer) -> 
 
 /// Decode a JWS Compact Serialization message with signature from a byte slice.
 ///
-/// This function is marked unsafe because it does not verify the message signature.
-/// You can use [`decode_verify`] as a safe alternative.
+/// # Safety
+/// This function has no memory safety implications,
+/// It was marked as unsafe because does not perform signature verification.
+/// It is now deprecated and has been replaced by [`decode_unverified`].
+///
+/// However, in most applications, you will want to use [`decode_verify`],
+/// which does verify the message signature.
+#[deprecated = "this function was marked unsafe but has no safety implications, use decode_unverified instead"]
 pub unsafe fn decode(data: &[u8]) -> Result<(DecodedMessage, Vec<u8>)> {
+	decode_unverified(data)
+}
+
+/// Decode a JWS Compact Serialization message with signature from a byte slice.
+///
+/// The signature is not verified.
+/// You can use [`decode_verify`] to decode the message and verify the signature.
+pub fn decode_unverified(data: &[u8]) -> Result<(DecodedMessage, Vec<u8>)> {
 	split_encoded_parts(data)?.decode()
 }
 
