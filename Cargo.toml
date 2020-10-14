@@ -11,15 +11,15 @@ license       = "BSD-2-Clause"
 edition       = "2018"
 
 [dependencies]
-crypto-mac    = "0.7"
-digest        = "0.8"
-hmac          = "0.7"
-sha2          = "0.8"
+crypto-mac    = "0.9"
+digest        = "0.9"
+hmac          = "0.9"
+sha2          = "0.9"
 serde         = "1.0"
 serde_derive  = "1.0"
 serde_json    = "1.0"
-base64        = "0.10"
+base64        = "0.13"
 derive-error  = "0.0"
 
 [dev-dependencies]
-assert2 = "0.1.1"
+assert2 = "0.3.3"

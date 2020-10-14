@@ -1,7 +1,7 @@
 //! HMAC [`Verifier`] and [`Signer`] implementations using [RustCrypto](https://github.com/RustCrypto).
 
-use crypto_mac::{Mac, MacResult};
-use hmac::{Hmac};
+use crypto_mac::{Mac, NewMac};
+use hmac::Hmac;
 
 use crate::{Error, JsonObject, JsonValue, parse_required_header_param, Result, Signer, Verifier};
 
@@ -85,7 +85,7 @@ impl<K: AsRef<[u8]>> Signer for Hs256Signer<K> {
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
 		let hmac = HmacSha256::new_varkey(self.key.as_ref()).unwrap();
-		Ok(compute_mac(encoded_header, encoded_payload, hmac).code().as_slice().to_owned())
+		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
 	}
 }
 
@@ -96,7 +96,7 @@ impl<K: AsRef<[u8]>> Signer for Hs384Signer<K> {
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
 		let hmac = HmacSha384::new_varkey(self.key.as_ref()).unwrap();
-		Ok(compute_mac(encoded_header, encoded_payload, hmac).code().as_slice().to_owned())
+		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
 	}
 }
 
@@ -107,22 +107,22 @@ impl<K: AsRef<[u8]>> Signer for Hs512Signer<K> {
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
 		let hmac = HmacSha512::new_varkey(self.key.as_ref()).unwrap();
-		Ok(compute_mac(encoded_header, encoded_payload, hmac).code().as_slice().to_owned())
+		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
 	}
 }
 
 /// Feed the encoded header and payload to a MAC in the proper format.
 fn feed_mac(encoded_header: &[u8], encoded_payload: &[u8], mac: &mut impl Mac) {
 	mac.reset();
-	mac.input(encoded_header);
-	mac.input(b".");
-	mac.input(encoded_payload);
+	mac.update(encoded_header);
+	mac.update(b".");
+	mac.update(encoded_payload);
 }
 
 /// Compute the Message Authentication Code for the MAC function.
-fn compute_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], mut mac: M) -> MacResult<M::OutputSize> {
+fn compute_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], mut mac: M) -> crypto_mac::Output<M> {
 	feed_mac(encoded_header, encoded_payload, &mut mac);
-	mac.result()
+	mac.finalize()
 }
 
 /// Verify the signature of a JWS Compact Serialization message.
