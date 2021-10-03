@@ -1,4 +1,4 @@
-Unreleased:
+Version 0.2.5 - 2021-10-03
   * Update to hmac 0.11.
   * Update to crypto-mac 0.11.
 
