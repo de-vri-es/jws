@@ -70,9 +70,9 @@ impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
 		let algorithm : &str = parse_required_header_param(protected_header, unprotected_header, "alg")?;
 
 		match algorithm {
-			"HS256" => verify_mac(encoded_header, encoded_payload, signature, HmacSha256::new_varkey(self.key.as_ref()).unwrap()),
-			"HS384" => verify_mac(encoded_header, encoded_payload, signature, HmacSha384::new_varkey(self.key.as_ref()).unwrap()),
-			"HS512" => verify_mac(encoded_header, encoded_payload, signature, HmacSha512::new_varkey(self.key.as_ref()).unwrap()),
+			"HS256" => verify_mac(encoded_header, encoded_payload, signature, HmacSha256::new_from_slice(self.key.as_ref()).unwrap()),
+			"HS384" => verify_mac(encoded_header, encoded_payload, signature, HmacSha384::new_from_slice(self.key.as_ref()).unwrap()),
+			"HS512" => verify_mac(encoded_header, encoded_payload, signature, HmacSha512::new_from_slice(self.key.as_ref()).unwrap()),
 			_       => Err(Error::unsupported_mac_algorithm(algorithm.to_string())),
 		}
 	}
@@ -84,7 +84,7 @@ impl<K: AsRef<[u8]>> Signer for Hs256Signer<K> {
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		let hmac = HmacSha256::new_varkey(self.key.as_ref()).unwrap();
+		let hmac = HmacSha256::new_from_slice(self.key.as_ref()).unwrap();
 		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
 	}
 }
@@ -95,7 +95,7 @@ impl<K: AsRef<[u8]>> Signer for Hs384Signer<K> {
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		let hmac = HmacSha384::new_varkey(self.key.as_ref()).unwrap();
+		let hmac = HmacSha384::new_from_slice(self.key.as_ref()).unwrap();
 		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
 	}
 }
@@ -106,7 +106,7 @@ impl<K: AsRef<[u8]>> Signer for Hs512Signer<K> {
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		let hmac = HmacSha512::new_varkey(self.key.as_ref()).unwrap();
+		let hmac = HmacSha512::new_from_slice(self.key.as_ref()).unwrap();
 		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
 	}
 }
