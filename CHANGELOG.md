@@ -1,3 +1,7 @@
+Version 0.2.6 - 2022-01-30
+  * Update to hmac 0.12.
+  * Update to sha2 0.10.
+
 Version 0.2.5 - 2021-10-03
   * Update to hmac 0.11.
   * Update to crypto-mac 0.11.

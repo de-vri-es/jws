@@ -1,7 +1,6 @@
 //! HMAC [`Verifier`] and [`Signer`] implementations using [RustCrypto](https://github.com/RustCrypto).
 
-use crypto_mac::{Mac, NewMac};
-use hmac::Hmac;
+use hmac::{Hmac, Mac};
 
 use crate::{Error, JsonObject, JsonValue, parse_required_header_param, Result, Signer, Verifier};
 
@@ -70,9 +69,9 @@ impl<K: AsRef<[u8]>> Verifier for HmacVerifier<K> {
 		let algorithm : &str = parse_required_header_param(protected_header, unprotected_header, "alg")?;
 
 		match algorithm {
-			"HS256" => verify_mac(encoded_header, encoded_payload, signature, HmacSha256::new_from_slice(self.key.as_ref()).unwrap()),
-			"HS384" => verify_mac(encoded_header, encoded_payload, signature, HmacSha384::new_from_slice(self.key.as_ref()).unwrap()),
-			"HS512" => verify_mac(encoded_header, encoded_payload, signature, HmacSha512::new_from_slice(self.key.as_ref()).unwrap()),
+			"HS256" => verify_mac::<HmacSha256>(encoded_header, encoded_payload, signature, self.key.as_ref()),
+			"HS384" => verify_mac::<HmacSha384>(encoded_header, encoded_payload, signature, self.key.as_ref()),
+			"HS512" => verify_mac::<HmacSha512>(encoded_header, encoded_payload, signature, self.key.as_ref()),
 			_       => Err(Error::unsupported_mac_algorithm(algorithm.to_string())),
 		}
 	}
@@ -84,8 +83,7 @@ impl<K: AsRef<[u8]>> Signer for Hs256Signer<K> {
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		let hmac = HmacSha256::new_from_slice(self.key.as_ref()).unwrap();
-		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
+		Ok(compute_mac::<HmacSha256>(encoded_header, encoded_payload, self.key.as_ref()).into_bytes().as_slice().to_owned())
 	}
 }
 
@@ -95,8 +93,7 @@ impl<K: AsRef<[u8]>> Signer for Hs384Signer<K> {
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		let hmac = HmacSha384::new_from_slice(self.key.as_ref()).unwrap();
-		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
+		Ok(compute_mac::<HmacSha384>(encoded_header, encoded_payload, self.key.as_ref()).into_bytes().as_slice().to_owned())
 	}
 }
 
@@ -106,29 +103,29 @@ impl<K: AsRef<[u8]>> Signer for Hs512Signer<K> {
 	}
 
 	fn compute_mac(&self, encoded_header: &[u8], encoded_payload: &[u8]) -> Result<Vec<u8>> {
-		let hmac = HmacSha512::new_from_slice(self.key.as_ref()).unwrap();
-		Ok(compute_mac(encoded_header, encoded_payload, hmac).into_bytes().as_slice().to_owned())
+		Ok(compute_mac::<HmacSha512>(encoded_header, encoded_payload, self.key.as_ref()).into_bytes().as_slice().to_owned())
 	}
 }
 
 /// Feed the encoded header and payload to a MAC in the proper format.
-fn feed_mac(encoded_header: &[u8], encoded_payload: &[u8], mac: &mut impl Mac) {
-	mac.reset();
+fn feed_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], mac: &mut M) {
 	mac.update(encoded_header);
 	mac.update(b".");
 	mac.update(encoded_payload);
 }
 
 /// Compute the Message Authentication Code for the MAC function.
-fn compute_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], mut mac: M) -> crypto_mac::Output<M> {
+fn compute_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], key: &[u8]) -> hmac::digest::CtOutput<M> {
+	let mut mac = M::new_from_slice(key).unwrap();
 	feed_mac(encoded_header, encoded_payload, &mut mac);
 	mac.finalize()
 }
 
 /// Verify the signature of a JWS Compact Serialization message.
-fn verify_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], mut mac: M) -> Result<()> {
+fn verify_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], key: &[u8]) -> Result<()> {
+	let mut mac = M::new_from_slice(key).unwrap();
 	feed_mac(encoded_header, encoded_payload, &mut mac);
-	mac.verify(signature).map_err(|_| Error::invalid_signature(""))
+	mac.verify_slice(signature).map_err(|_| Error::invalid_signature(""))
 }
 
 #[cfg(test)]
@@ -181,6 +178,7 @@ mod test {
 	}
 
 	#[test]
+	#[allow(clippy::redundant_clone)]
 	fn test_encode_sign_hmac_sha2() {
 		let header       = json_object!{"typ": "JWT"};
 		let signed_hs256 = compact::encode_sign(header.clone(), b"foo", &Hs256Signer::new(b"secretkey")).expect("sign HS256 failed");
