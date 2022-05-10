@@ -1,3 +1,6 @@
+main
+  * Fix compilation with hmac 0.12.
+
 Version 0.2.6 - 2022-01-30
   * Update to hmac 0.12.
   * Update to sha2 0.10.

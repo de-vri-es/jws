@@ -1,6 +1,7 @@
 //! HMAC [`Verifier`] and [`Signer`] implementations using [RustCrypto](https://github.com/RustCrypto).
 
 use hmac::{Hmac, Mac};
+use hmac::digest::KeyInit;
 
 use crate::{Error, JsonObject, JsonValue, parse_required_header_param, Result, Signer, Verifier};
 
@@ -108,22 +109,22 @@ impl<K: AsRef<[u8]>> Signer for Hs512Signer<K> {
 }
 
 /// Feed the encoded header and payload to a MAC in the proper format.
-fn feed_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], mac: &mut M) {
+fn feed_mac<M: Mac + KeyInit>(encoded_header: &[u8], encoded_payload: &[u8], mac: &mut M) {
 	mac.update(encoded_header);
 	mac.update(b".");
 	mac.update(encoded_payload);
 }
 
 /// Compute the Message Authentication Code for the MAC function.
-fn compute_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], key: &[u8]) -> hmac::digest::CtOutput<M> {
-	let mut mac = M::new_from_slice(key).unwrap();
+fn compute_mac<M: Mac + KeyInit>(encoded_header: &[u8], encoded_payload: &[u8], key: &[u8]) -> hmac::digest::CtOutput<M> {
+	let mut mac: M = Mac::new_from_slice(key).unwrap();
 	feed_mac(encoded_header, encoded_payload, &mut mac);
 	mac.finalize()
 }
 
 /// Verify the signature of a JWS Compact Serialization message.
-fn verify_mac<M: Mac>(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], key: &[u8]) -> Result<()> {
-	let mut mac = M::new_from_slice(key).unwrap();
+fn verify_mac<M: Mac + KeyInit>(encoded_header: &[u8], encoded_payload: &[u8], signature: &[u8], key: &[u8]) -> Result<()> {
+	let mut mac: M = Mac::new_from_slice(key).unwrap();
 	feed_mac(encoded_header, encoded_payload, &mut mac);
 	mac.verify_slice(signature).map_err(|_| Error::invalid_signature(""))
 }
