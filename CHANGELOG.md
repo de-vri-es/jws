@@ -1,4 +1,4 @@
-main
+Version 0.2.7 - 2022-05-10
   * Fix compilation with hmac 0.12.
 
 Version 0.2.6 - 2022-01-30
