@@ -1,5 +1,5 @@
 Version 0.2.7 - 2022-05-10
-  * Fix compilation with hmac 0.12.
+  * Fix compilation with digest 0.10.2 and up.
 
 Version 0.2.6 - 2022-01-30
   * Update to hmac 0.12.
