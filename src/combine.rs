@@ -95,7 +95,7 @@ mod test {
 	#[test]
 	fn test_encode_sign_hmac_sha2() {
 		let header = json_object!{"typ": "JWT"};
-		let signed = compact::encode_sign(header.clone(), b"foo", &Hs256Signer::new(b"secretkey")).expect("sign HS256 failed");
+		let signed = compact::encode_sign(header, b"foo", &Hs256Signer::new(b"secretkey")).expect("sign HS256 failed");
 
 		let verifier_wrong = HmacVerifier::new(b"wrong-key");
 		let verifier_right = HmacVerifier::new(b"secretkey");
