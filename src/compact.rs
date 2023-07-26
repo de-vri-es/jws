@@ -8,6 +8,7 @@
 //! These functions combine encoding and signing or decoding and verifying in a single step.
 
 use std::collections::BTreeMap;
+use base64::Engine;
 
 use crate::{
 	Error,
@@ -29,15 +30,16 @@ pub fn encode(header: &JsonObject, payload: &[u8]) -> EncodedMessage {
 	let header_json  = serde_json::to_vec(&header).unwrap();
 
 	let output_len = base64_len(header_json.len()) + base64_len(payload.len()) + 1;
-	let mut buffer = String::with_capacity(output_len);
+	let mut data = String::with_capacity(output_len);
 
-	base64::encode_config_buf(&header_json, base64::URL_SAFE_NO_PAD, &mut buffer);
-	let header_length = buffer.len();
+	let base64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+	base64.encode_string(&header_json, &mut data);
+	let header_length = data.len();
 
-	buffer.push('.');
-	base64::encode_config_buf(&payload, base64::URL_SAFE_NO_PAD, &mut buffer);
+	data.push('.');
+	base64.encode_string(&payload, &mut data);
 
-	EncodedMessage{data: buffer, header_length}
+	EncodedMessage{data, header_length}
 }
 
 /// Encode and sign the message.
@@ -62,7 +64,9 @@ pub fn encode_sign(header: JsonObject, payload: &[u8], signer: &impl Signer) -> 
 	let mut data       = encoded.into_data();
 	data.reserve(base64_len(signature.len()) + 1);
 	data.push('.');
-	base64::encode_config_buf(&signature, base64::URL_SAFE_NO_PAD, &mut data);
+
+	let base64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+	base64.encode_string(&signature, &mut data);
 
 	Ok(EncodedSignedMessage{data, header_length, payload_length})
 }
@@ -298,7 +302,8 @@ fn base64_len(input_len: usize) -> usize {
 
 /// Decode a base64-url encoded string.
 fn decode_base64_url(value: &[u8], field_name: &str) -> Result<Vec<u8>> {
-	match base64::decode_config(value, base64::URL_SAFE_NO_PAD) {
+	let base64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+	match base64.decode(value) {
 		Ok(x)  => Ok(x),
 		Err(_) => Err(Error::invalid_message(format!("invalid base64 in {}", field_name)))
 	}

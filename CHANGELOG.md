@@ -1,5 +1,6 @@
 main:
   * Change links in `Cargo.toml` to `https`.
+  * Update to `base64` version `0.21`.
 
 Version 0.2.7 - 2022-05-10
   * Fix compilation with digest 0.10.2 and up.
