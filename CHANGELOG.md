@@ -1,4 +1,4 @@
-main:
+Version 0.2.8 - 2023-06-26:
   * Change links in `Cargo.toml` to `https`.
   * Update to `base64` version `0.21`.
 
