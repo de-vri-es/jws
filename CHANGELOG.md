@@ -1,3 +1,6 @@
+Version 0.2.9 - 2023-11-06:
+  * Implement `std::error::Error` for `Error`.
+
 Version 0.2.8 - 2023-07-26:
   * Change links in `Cargo.toml` to `https`.
   * Update to `base64` version `0.21`.
